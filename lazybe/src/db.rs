@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 
-use sea_query::{PostgresQueryBuilder, SqliteQueryBuilder};
-use sqlx::{Database, Executor, FromRow, IntoArguments, Postgres, Sqlite};
+use sqlx::{Database, Executor, FromRow, IntoArguments};
 
 use crate::{CreateQuery, DeleteQuery, GetQuery};
 
@@ -10,7 +9,8 @@ pub struct DbCtx<Qb, Db> {
     db: PhantomData<Db>,
 }
 
-impl DbCtx<SqliteQueryBuilder, Sqlite> {
+#[cfg(feature = "sqlite")]
+impl DbCtx<sea_query::SqliteQueryBuilder, sqlx::Sqlite> {
     pub fn sqlite() -> Self {
         DbCtx {
             query_builder: PhantomData,
@@ -19,7 +19,8 @@ impl DbCtx<SqliteQueryBuilder, Sqlite> {
     }
 }
 
-impl DbCtx<PostgresQueryBuilder, Postgres> {
+#[cfg(feature = "postgres")]
+impl DbCtx<sea_query::PostgresQueryBuilder, sqlx::Postgres> {
     pub fn postgres() -> Self {
         DbCtx {
             query_builder: PhantomData,

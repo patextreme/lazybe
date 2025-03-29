@@ -18,7 +18,7 @@ fn expand_enum(input: &DeriveInput, data_enum: &DataEnum) -> syn::Result<TokenSt
     if let Some(variant) = data_enum.variants.iter().find(|v| !v.fields.is_empty()) {
         Err(syn::Error::new_spanned(
             &variant.ident,
-            "Enum vairant cannot contain any fields",
+            "Enum variant cannot contain fields",
         ))?
     }
 
@@ -34,11 +34,12 @@ fn expand_enum(input: &DeriveInput, data_enum: &DataEnum) -> syn::Result<TokenSt
     });
 
     Ok(quote! {
-        impl ToString for #ident {
-            fn to_string(&self) -> String {
-                match self {
+        impl std::fmt::Display for #ident {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let s = match self {
                     #(#to_string_match_arms),*
-                }
+                };
+                write!(f, "{}", s)
             }
         }
 

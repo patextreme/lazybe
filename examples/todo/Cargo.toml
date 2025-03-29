@@ -1,0 +1,13 @@
+[package]
+name = "example-todo"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+lazybe = { workspace = true, features = ["sqlite"] }
+sea-query = { workspace = true }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite"] }
+
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
