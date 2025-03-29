@@ -19,7 +19,7 @@
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
-        rust = pkgs.rust-bin.stable.latest.default.override {
+        rust = pkgs.rust-bin.nightly."2025-03-24".default.override {
           extensions = [
             "rust-src"
             "rust-analyzer"
@@ -83,6 +83,8 @@
               ${pkgs.cowsay}/bin/cowsay "Working on project root directory: ${rootDir}"
               cd ${rootDir}
             '';
+
+            RUST_LOG = "info";
           };
       }
     );

@@ -1,0 +1,13 @@
+[package]
+name = "lazybe"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+lazybe-macro = { path = "../lazybe-macro" }
+sea-query = { workspace = true, features = [
+  "backend-sqlite",
+  "backend-postgres",
+] }
+sqlx = { workspace = true, features = ["sqlite", "postgres"] }

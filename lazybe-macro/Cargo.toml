@@ -1,0 +1,15 @@
+[package]
+name = "lazybe-macro"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+convert_case = "0.8"
+darling = "0.20"
+proc-macro2 = "1"
+quote = "1"
+syn = "2"

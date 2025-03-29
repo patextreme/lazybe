@@ -1,0 +1,15 @@
+[package]
+name = "lazybe-playground"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+axum = { workspace = true }
+lazybe = { path = "../lazybe" }
+sea-query = { workspace = true, features = ["derive", "backend-sqlite"] }
+serde = { workspace = true, features = ["derive"] }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite"] }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }

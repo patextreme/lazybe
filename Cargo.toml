@@ -1,0 +1,17 @@
+[workspace]
+resolver = "3"
+members = ["lazybe", "lazybe-macro", "lazybe-playground"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Pat Losoponkul <pat.losoponkul@gmail.com>"]
+
+[workspace.dependencies]
+axum = "0.8"
+sea-query = "0.32"
+serde = "1"
+sqlx = "0.8"
+tokio = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
