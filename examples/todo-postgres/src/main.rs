@@ -5,15 +5,13 @@ use sqlx::{Executor, Pool, Postgres};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let pool = PgPoolOptions::new()
-        .max_connections(5)
         .connect("postgres://postgres:postgres@localhost/postgres")
         .await?;
+    let ctx = DbCtx::postgres();
     run_migration(&pool).await?;
 
-    let ctx = DbCtx::postgres();
-
     let new_todo = CreateTodo {
-        title: "Get some milk from supermarket".to_string(),
+        title: "Optimize slow database query".to_string(),
         description: None,
         status: Status::Todo,
         priority: Some(Priority::Medium),
@@ -45,7 +43,7 @@ CREATE TABLE IF NOT EXISTS todo (
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::Dal)]
+#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalEntity)]
 #[lazybe(table = "todo")]
 pub struct Todo {
     #[lazybe(primary_key)]

@@ -60,7 +60,7 @@ impl EntityMeta {
                 .filter(|(_, attr)| !attr.primary_key)
                 .cloned()
                 .collect(),
-            sqlx_row_ident: format_ident!("{}Row", input.ident),
+            sqlx_row_ident: format_ident!("{}SqlxRow", input.ident),
             sea_query_ident: format_ident!("{}SeaQueryIdent", input.ident),
         })
     }
@@ -83,13 +83,13 @@ fn expand_struct(input: &DeriveInput, data_struct: &DataStruct) -> syn::Result<T
     match &data_struct.fields {
         Fields::Named(fields_named) => {
             let entity_meta = EntityMeta::try_parse(input, fields_named)?;
-            let entity_impl = create_entity_impl(&entity_meta);
-            let dal_mod_impl = dal_mod_impl(&entity_meta);
-            let entity_crud_trait_impl = entity_crud_trait_impl(&entity_meta);
+            let entity_types_impl = entity_types_impl(&entity_meta);
+            let entity_row_impl = entity_row_impl(&entity_meta);
+            let entity_query_trait_impl = entity_query_trait_impl(&entity_meta);
             Ok(quote! {
-                #entity_impl
-                #entity_crud_trait_impl
-                #dal_mod_impl
+                #entity_types_impl
+                #entity_query_trait_impl
+                #entity_row_impl
             })
         }
         Fields::Unnamed(_) => Err(syn::Error::new_spanned(
@@ -103,7 +103,7 @@ fn expand_struct(input: &DeriveInput, data_struct: &DataStruct) -> syn::Result<T
     }
 }
 
-fn create_entity_impl(entity_meta: &EntityMeta) -> TokenStream {
+fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
     let entity_vis = &entity_meta.entity_vis;
     let create_entity = &entity_meta.create_entity;
     let create_entity_fields = entity_meta.create_entity_fields.iter().map(|f| {
@@ -119,8 +119,9 @@ fn create_entity_impl(entity_meta: &EntityMeta) -> TokenStream {
     }
 }
 
-fn dal_mod_impl(entity_meta: &EntityMeta) -> TokenStream {
+fn entity_row_impl(entity_meta: &EntityMeta) -> TokenStream {
     let entity = &entity_meta.entity_ident;
+    let entity_vis = &entity_meta.entity_vis;
     let sqlx_row_ident = &entity_meta.sqlx_row_ident;
     let sea_query_ident = &entity_meta.sea_query_ident;
     let table_name = entity_meta.entity_attr.table.to_string();
@@ -143,7 +144,7 @@ fn dal_mod_impl(entity_meta: &EntityMeta) -> TokenStream {
     });
     quote! {
         #[derive(sqlx::FromRow)]
-        pub struct #sqlx_row_ident {
+        #entity_vis struct #sqlx_row_ident {
             #(#all_field_defs),*
         }
 
@@ -157,14 +158,14 @@ fn dal_mod_impl(entity_meta: &EntityMeta) -> TokenStream {
 
         #[derive(sea_query::Iden)]
         #[iden = #table_name]
-        pub enum #sea_query_ident {
+        enum #sea_query_ident {
             Table,
             #(#all_field_idents),*
         }
     }
 }
 
-fn entity_crud_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
+fn entity_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let entity = &entity_meta.entity_ident;
     let sqlx_row_ident = &entity_meta.sqlx_row_ident;
     let sea_query_ident = &entity_meta.sea_query_ident;
