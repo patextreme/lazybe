@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use sqlx::{Database, Executor, FromRow, IntoArguments};
 
-use crate::{CreateQuery, DeleteQuery, GetQuery};
+use crate::{CreateQuery, DeleteQuery, GetQuery, UpdateQuery};
 
 pub struct DbCtx<Qb, Db> {
     query_builder: PhantomData<Qb>,
@@ -35,6 +35,17 @@ where
     Db: Database,
     for<'q> <Db as Database>::Arguments<'q>: IntoArguments<'q, Db>,
 {
+    pub async fn get<'e, T, E>(&self, executor: E, id: <T as GetQuery>::Pk) -> Result<Option<T>, sqlx::Error>
+    where
+        E: Executor<'e, Database = Db>,
+        T: GetQuery,
+        <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+    {
+        let query = <T as GetQuery>::get_query(id).to_string(Qb::default());
+        let maybe_entity: Option<<T as GetQuery>::Row> = sqlx::query_as(&query).fetch_optional(executor).await?;
+        Ok(maybe_entity.map(|i| i.into()))
+    }
+
     pub async fn create<'e, T, E>(&self, executor: E, input: <T as CreateQuery>::Create) -> Result<T, sqlx::Error>
     where
         E: Executor<'e, Database = Db>,
@@ -46,14 +57,14 @@ where
         Ok(entity.into())
     }
 
-    pub async fn get<'e, T, E>(&self, executor: E, id: <T as GetQuery>::Pk) -> Result<Option<T>, sqlx::Error>
+    pub async fn update<'e, T, E>(&self, executor: E, id: <T as UpdateQuery>::Pk, input: <T as UpdateQuery>::Update) -> Result<Option<T>, sqlx::Error>
     where
         E: Executor<'e, Database = Db>,
-        T: GetQuery,
-        <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+        T: UpdateQuery,
+        <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
     {
-        let query = <T as GetQuery>::get_query(id).to_string(Qb::default());
-        let maybe_entity: Option<<T as GetQuery>::Row> = sqlx::query_as(&query).fetch_optional(executor).await?;
+        let query = <T as UpdateQuery>::update_query(id, input).to_string(Qb::default());
+        let maybe_entity: Option<<T as UpdateQuery>::Row> = sqlx::query_as(&query).fetch_optional(executor).await?;
         Ok(maybe_entity.map(|i| i.into()))
     }
 

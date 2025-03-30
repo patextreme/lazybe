@@ -58,20 +58,40 @@ async fn main() -> anyhow::Result<()> {
         )
         .await?;
 
-    let new_todo = CreateTodo {
-        title: "Optimize slow database query".to_string(),
-        description: None,
-        status: Status::Backlog,
-        assignee: Some(alice.id),
-    };
-
-    let todo1: Todo = ctx.create(&pool, new_todo).await?;
-    println!("Todo added to db with id {:?}", todo1.id);
+    let todo1: Todo = ctx
+        .create(
+            &pool,
+            CreateTodo {
+                title: "Optimize slow database query".to_string(),
+                description: None,
+                status: Status::Todo,
+                assignee: Some(alice.id),
+            },
+        )
+        .await?;
 
     let todo2: Todo = ctx.get(&pool, todo1.id.clone()).await?.unwrap();
-    println!("Todo read from db: {:#?}", todo2);
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+    let todo3: Todo = ctx
+        .update(
+            &pool,
+            todo2.id.clone(),
+            UpdateTodo {
+                description: Some(Some("fix this asap!!".to_string())),
+                status: Some(Status::Doing),
+                ..Default::default()
+            },
+        )
+        .await?
+        .unwrap();
+
+    println!(">>>>> Todo#2 <<<<<\n{:#?}", todo2);
+    println!(">>>>> Todo#3 <<<<<\n{:#?}", todo3);
 
     assert_eq!(todo1, todo2);
+    assert_eq!(todo2.status, Status::Todo);
+    assert_eq!(todo3.status, Status::Doing);
     Ok(())
 }
 
@@ -99,4 +119,3 @@ CREATE TABLE IF NOT EXISTS todo (
     .await?;
     Ok(())
 }
-

@@ -38,13 +38,14 @@ struct EntityMeta {
     entity_vis: Visibility,
     entity_attr: EntityAttr,
     create_entity: Ident,
+    update_entity: Ident,
     sqlx_row_ident: Ident,
     sea_query_ident: Ident,
     primary_key: Field,
     created_at: Option<Field>,
     updated_at: Option<Field>,
-    all_entity_fields: Vec<(Field, EntityFieldAttr)>,
-    create_entity_fields: Vec<(Field, EntityFieldAttr)>,
+    all_fields: Vec<(Field, EntityFieldAttr)>,
+    user_defined_fields: Vec<(Field, EntityFieldAttr)>,
 }
 
 impl EntityMeta {
@@ -59,13 +60,14 @@ impl EntityMeta {
             entity_vis: input.vis.clone(),
             entity_attr: EntityAttr::from_derive_input(input)?,
             create_entity: format_ident!("Create{}", input.ident),
+            update_entity: format_ident!("Update{}", input.ident),
             sqlx_row_ident: format_ident!("{}SqlxRow", input.ident),
             sea_query_ident: format_ident!("{}SeaQueryIdent", input.ident),
             primary_key: Self::detect_primary_key(&input.ident, &parsed_fields)?,
             created_at: Self::detect_created_at(&input.ident, &parsed_fields)?,
             updated_at: Self::detect_updated_at(&input.ident, &parsed_fields)?,
-            all_entity_fields: parsed_fields.to_vec(),
-            create_entity_fields: parsed_fields
+            all_fields: parsed_fields.to_vec(),
+            user_defined_fields: parsed_fields
                 .iter()
                 .filter(|(_, attr)| !attr.primary_key)
                 .filter(|(_, attr)| !attr.created_at)
@@ -148,15 +150,26 @@ fn expand_struct(input: &DeriveInput, data_struct: &DataStruct) -> syn::Result<T
 fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
     let entity_vis = &entity_meta.entity_vis;
     let create_entity = &entity_meta.create_entity;
-    let create_entity_fields = entity_meta.create_entity_fields.iter().map(|f| {
+    let update_entity = &entity_meta.update_entity;
+    let create_entity_fields = entity_meta.user_defined_fields.iter().map(|f| {
         let field_vis = &f.0.vis;
         let field_ident = f.0.ident.as_ref().unwrap();
         let field_ty = &f.0.ty;
         quote! { #field_vis #field_ident: #field_ty }
     });
+    let update_entity_fields = entity_meta.user_defined_fields.iter().map(|f| {
+        let field_vis = &f.0.vis;
+        let field_ident = f.0.ident.as_ref().unwrap();
+        let field_ty = &f.0.ty;
+        quote! { #field_vis #field_ident: Option<#field_ty> }
+    });
     quote! {
         #entity_vis struct #create_entity {
             #(#create_entity_fields),*
+        }
+        #[derive(Default)]
+        #entity_vis struct #update_entity {
+            #(#update_entity_fields),*
         }
     }
 }
@@ -167,7 +180,7 @@ fn entity_row_impl(entity_meta: &EntityMeta) -> TokenStream {
     let sqlx_row_ident = &entity_meta.sqlx_row_ident;
     let sea_query_ident = &entity_meta.sea_query_ident;
     let table_name = entity_meta.entity_attr.table.to_string();
-    let all_field_idents = entity_meta.all_entity_fields.iter().map(|(f, _)| {
+    let all_field_idents = entity_meta.all_fields.iter().map(|(f, _)| {
         let ident_str = f.ident.as_ref().unwrap().to_string();
         let ident_pascal = format_ident!("{}", ident_str.to_case(Case::Pascal));
         quote! {
@@ -175,12 +188,12 @@ fn entity_row_impl(entity_meta: &EntityMeta) -> TokenStream {
             #ident_pascal
         }
     });
-    let all_field_defs = entity_meta.all_entity_fields.iter().map(|(f, _)| {
+    let all_field_defs = entity_meta.all_fields.iter().map(|(f, _)| {
         let ident = f.ident.as_ref().unwrap();
         let ty = &f.ty;
         quote! { #ident: #ty }
     });
-    let all_field_intos = entity_meta.all_entity_fields.iter().map(|(f, _)| {
+    let all_field_intos = entity_meta.all_fields.iter().map(|(f, _)| {
         let ident = f.ident.as_ref().unwrap();
         quote! { #ident: value.#ident }
     });
@@ -212,22 +225,36 @@ fn entity_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let sqlx_row_ident = &entity_meta.sqlx_row_ident;
     let sea_query_ident = &entity_meta.sea_query_ident;
     let create_entity = &entity_meta.create_entity;
+    let update_entity = &entity_meta.update_entity;
     let all_field_idents_pascal = entity_meta
-        .all_entity_fields
+        .all_fields
         .iter()
-        .flat_map(|f| f.0.ident.as_ref())
+        .flat_map(|(f, _)| f.ident.as_ref())
         .map(|i| format_ident!("{}", i.to_string().to_case(Case::Pascal)))
         .collect::<Vec<_>>();
     let create_field_idents_pascal = entity_meta
-        .create_entity_fields
+        .user_defined_fields
         .iter()
-        .flat_map(|f| f.0.ident.as_ref())
+        .flat_map(|(f, _)| f.ident.as_ref())
         .map(|i| format_ident!("{}", i.to_string().to_case(Case::Pascal)))
         .collect::<Vec<_>>();
     let create_field_idents = entity_meta
-        .create_entity_fields
+        .user_defined_fields
         .iter()
-        .flat_map(|f| f.0.ident.as_ref())
+        .flat_map(|(f, _)| f.ident.as_ref())
+        .cloned()
+        .collect::<Vec<_>>();
+    let update_field_idents = create_field_idents
+        .iter()
+        .cloned()
+        .zip(create_field_idents_pascal.iter().cloned())
+        .map(|(ident, ident_pascal)| {
+            quote! {
+                if let Some(new_value) = input.#ident {
+                    values.push((#sea_query_ident::#ident_pascal, new_value.into()));
+                }
+            }
+        })
         .collect::<Vec<_>>();
     let pk_ty = &entity_meta.primary_key.ty;
     let pk_ident_pascal = format_ident!(
@@ -266,6 +293,17 @@ fn entity_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
         .as_ref()
         .map(|_| quote! { now.into() })
         .into_iter();
+    let update_updated_at = entity_meta
+        .updated_at
+        .as_ref()
+        .and_then(|f| f.ident.as_ref())
+        .map(|i| format_ident!("{}", i.to_string().to_case(Case::Pascal)))
+        .map(|ident| {
+            quote! {
+                values.push((#sea_query_ident::#ident, now.into()));
+            }
+        })
+        .into_iter();
 
     quote! {
         impl lazybe::CreateQuery for #entity {
@@ -285,6 +323,29 @@ fn entity_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
                         #(#created_at_value,)*
                         #(#updated_at_value,)*
                     ])
+                    .returning_all()
+                    .to_owned()
+            }
+        }
+
+        impl lazybe::UpdateQuery for #entity {
+            type Pk = #pk_ty;
+            type Update = #update_entity;
+            type Row = #sqlx_row_ident;
+            fn update_query(id: Self::Pk, input: Self::Update) -> sea_query::UpdateStatement {
+                #now_value
+
+                let mut values = Vec::new();
+                #(#update_field_idents)*
+                #(#update_updated_at)*
+
+                sea_query::Query::update()
+                    .table(#sea_query_ident::Table)
+                    .values(values)
+                    .cond_where(
+                        sea_query::Cond::all()
+                            .add(sea_query::Expr::col(#sea_query_ident::#pk_ident_pascal).eq(id))
+                    )
                     .returning_all()
                     .to_owned()
             }
