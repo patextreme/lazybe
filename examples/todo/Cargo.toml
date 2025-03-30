@@ -6,8 +6,8 @@ authors.workspace = true
 
 [dependencies]
 lazybe = { workspace = true, features = ["sqlite"] }
-sea-query = { workspace = true }
-sqlx = { workspace = true, features = ["runtime-tokio", "sqlite"] }
+sea-query = { workspace = true, features = ["with-chrono"] }
+sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono"] }
 
 anyhow = "1"
 tokio = { version = "1", features = ["full"] }

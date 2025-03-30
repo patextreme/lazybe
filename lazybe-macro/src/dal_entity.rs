@@ -27,6 +27,10 @@ struct EntityAttr {
 struct EntityFieldAttr {
     #[darling(default)]
     primary_key: bool,
+    #[darling(default)]
+    created_at: bool,
+    #[darling(default)]
+    updated_at: bool,
 }
 
 struct EntityMeta {
@@ -34,11 +38,13 @@ struct EntityMeta {
     entity_vis: Visibility,
     entity_attr: EntityAttr,
     create_entity: Ident,
-    primary_key: Field,
-    all_entity_fields: Vec<(Field, EntityFieldAttr)>,
-    create_entity_fields: Vec<(Field, EntityFieldAttr)>,
     sqlx_row_ident: Ident,
     sea_query_ident: Ident,
+    primary_key: Field,
+    created_at: Option<Field>,
+    updated_at: Option<Field>,
+    all_entity_fields: Vec<(Field, EntityFieldAttr)>,
+    create_entity_fields: Vec<(Field, EntityFieldAttr)>,
 }
 
 impl EntityMeta {
@@ -53,15 +59,19 @@ impl EntityMeta {
             entity_vis: input.vis.clone(),
             entity_attr: EntityAttr::from_derive_input(input)?,
             create_entity: format_ident!("Create{}", input.ident),
+            sqlx_row_ident: format_ident!("{}SqlxRow", input.ident),
+            sea_query_ident: format_ident!("{}SeaQueryIdent", input.ident),
             primary_key: Self::detect_primary_key(&input.ident, &parsed_fields)?,
+            created_at: Self::detect_created_at(&input.ident, &parsed_fields)?,
+            updated_at: Self::detect_updated_at(&input.ident, &parsed_fields)?,
             all_entity_fields: parsed_fields.to_vec(),
             create_entity_fields: parsed_fields
                 .iter()
                 .filter(|(_, attr)| !attr.primary_key)
+                .filter(|(_, attr)| !attr.created_at)
+                .filter(|(_, attr)| !attr.updated_at)
                 .cloned()
                 .collect(),
-            sqlx_row_ident: format_ident!("{}SqlxRow", input.ident),
-            sea_query_ident: format_ident!("{}SeaQueryIdent", input.ident),
         })
     }
 
@@ -76,6 +86,38 @@ impl EntityMeta {
             }
         }
         maybe_pk.ok_or_else(|| syn::Error::new_spanned(entity, "Exactly 1 field must be primary key"))
+    }
+
+    fn detect_created_at(entity: &Ident, all_fields: &[(Field, EntityFieldAttr)]) -> syn::Result<Option<Field>> {
+        let mut maybe_field = None;
+        for (field, attr) in all_fields {
+            if attr.created_at {
+                match maybe_field {
+                    Some(_) => Err(syn::Error::new_spanned(
+                        entity,
+                        "No more then 1 field can be created_at",
+                    ))?,
+                    None => maybe_field = Some(field.clone()),
+                }
+            }
+        }
+        Ok(maybe_field)
+    }
+
+    fn detect_updated_at(entity: &Ident, all_fields: &[(Field, EntityFieldAttr)]) -> syn::Result<Option<Field>> {
+        let mut maybe_field = None;
+        for (field, attr) in all_fields {
+            if attr.updated_at {
+                match maybe_field {
+                    Some(_) => Err(syn::Error::new_spanned(
+                        entity,
+                        "No more then 1 field can be updated_at",
+                    ))?,
+                    None => maybe_field = Some(field.clone()),
+                }
+            }
+        }
+        Ok(maybe_field)
     }
 }
 
@@ -198,19 +240,50 @@ fn entity_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
             .to_string()
             .to_case(Case::Pascal)
     );
+    let created_at_ident_pascal = entity_meta
+        .created_at
+        .as_ref()
+        .and_then(|f| f.ident.as_ref())
+        .map(|i| format_ident!("{}", i.to_string().to_case(Case::Pascal)))
+        .map(|ident| quote! { #sea_query_ident::#ident })
+        .into_iter();
+    let updated_at_ident_pascal = entity_meta
+        .updated_at
+        .as_ref()
+        .and_then(|f| f.ident.as_ref())
+        .map(|i| format_ident!("{}", i.to_string().to_case(Case::Pascal)))
+        .map(|ident| quote! { #sea_query_ident::#ident })
+        .into_iter();
+    let now_value = Some(quote! { let now = sqlx::types::chrono::Utc::now(); })
+        .filter(|_| entity_meta.created_at.is_some() || entity_meta.updated_at.is_some());
+    let created_at_value = entity_meta
+        .created_at
+        .as_ref()
+        .map(|_| quote! { now.into() })
+        .into_iter();
+    let updated_at_value = entity_meta
+        .updated_at
+        .as_ref()
+        .map(|_| quote! { now.into() })
+        .into_iter();
 
     quote! {
         impl lazybe::CreateQuery for #entity {
             type Create = #create_entity;
             type Row = #sqlx_row_ident;
             fn create_query(input: Self::Create) -> sea_query::InsertStatement {
+                #now_value
                 sea_query::Query::insert()
                     .into_table(#sea_query_ident::Table)
                     .columns([
-                        #(#sea_query_ident::#create_field_idents_pascal),*
+                        #(#sea_query_ident::#create_field_idents_pascal,)*
+                        #(#created_at_ident_pascal,)*
+                        #(#updated_at_ident_pascal,)*
                     ])
-                    .values_panic([
-                        #(input.#create_field_idents.into()),*
+                   .values_panic([
+                        #(input.#create_field_idents.into(),)*
+                        #(#created_at_value,)*
+                        #(#updated_at_value,)*
                     ])
                     .returning_all()
                     .to_owned()
