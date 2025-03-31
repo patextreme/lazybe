@@ -1,4 +1,5 @@
 use lazybe::DbCtx;
+use lazybe::filter::Filter;
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 
@@ -19,6 +20,12 @@ pub struct Staff {
 
 #[derive(Debug, Clone, PartialEq, Eq, lazybe::DalNewtype)]
 pub struct TodoId(u64);
+
+impl From<TodoId> for u64 {
+    fn from(value: TodoId) -> Self {
+        value.0
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, lazybe::DalEntity)]
 #[lazybe(table = "todo")]
@@ -53,45 +60,57 @@ async fn main() -> anyhow::Result<()> {
         .create(
             &pool,
             CreateStaff {
-                name: "alice".to_string(),
+                name: "Alice".to_string(),
             },
         )
         .await?;
 
-    let todo1: Todo = ctx
-        .create(
+    let todo_defs = [
+        ("Do homework", Status::Doing),
+        ("Wash car", Status::Todo),
+    ];
+    for (title, status) in todo_defs {
+        ctx.create::<Todo, _>(
             &pool,
             CreateTodo {
-                title: "Optimize slow database query".to_string(),
+                title: title.to_string(),
                 description: None,
-                status: Status::Todo,
-                assignee: Some(alice.id),
+                status,
+                assignee: Some(alice.id.clone()),
             },
         )
         .await?;
+    }
 
-    let todo2: Todo = ctx.get(&pool, todo1.id.clone()).await?.unwrap();
+    let tasks = ctx.list::<Todo, _>(&pool, Filter::empty()).await?;
+    println!(">>>>> All tasks <<<<<\n{:#?}", tasks);
 
-    tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
-    let todo3: Todo = ctx
-        .update(
+    // Alice pick up a task and complete it
+    let alice_incomplete_tasks = ctx
+        .list::<Todo, _>(
             &pool,
-            todo2.id.clone(),
-            UpdateTodo {
-                description: Some(Some("fix this asap!!".to_string())),
-                status: Some(Status::Doing),
-                ..Default::default()
-            },
+            Filter::all([
+                TodoFilter::assignee().eq(Some(alice.id.clone())),
+                TodoFilter::status().neq(Status::Done),
+            ]),
         )
-        .await?
-        .unwrap();
+        .await?;
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    ctx.update::<Todo, _>(
+        &pool,
+        alice_incomplete_tasks.first().cloned().unwrap().id,
+        UpdateTodo {
+            status: Some(Status::Done),
+            ..Default::default()
+        },
+    )
+    .await?;
 
-    println!(">>>>> Todo#2 <<<<<\n{:#?}", todo2);
-    println!(">>>>> Todo#3 <<<<<\n{:#?}", todo3);
+    let completed_tasks = ctx
+        .list(&pool, Filter::all([TodoFilter::status().eq(Status::Done)]))
+        .await?;
+    println!(">>>>> Completed tasks <<<<<\n{:#?}", completed_tasks);
 
-    assert_eq!(todo1, todo2);
-    assert_eq!(todo2.status, Status::Todo);
-    assert_eq!(todo3.status, Status::Doing);
     Ok(())
 }
 

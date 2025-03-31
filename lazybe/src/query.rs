@@ -1,7 +1,14 @@
+use crate::filter::Filter;
+
 pub trait GetQuery {
     type Pk;
     type Row;
     fn get_query(id: Self::Pk) -> sea_query::SelectStatement;
+}
+
+pub trait ListQuery: Sized {
+    type Row;
+    fn list_query(filter: Filter<Self>) -> sea_query::SelectStatement;
 }
 
 pub trait CreateQuery {

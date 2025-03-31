@@ -2,7 +2,8 @@ use std::marker::PhantomData;
 
 use sqlx::{Database, Executor, FromRow, IntoArguments};
 
-use crate::{CreateQuery, DeleteQuery, GetQuery, UpdateQuery};
+use crate::filter::Filter;
+use crate::{CreateQuery, DeleteQuery, GetQuery, ListQuery, UpdateQuery};
 
 pub struct DbCtx<Qb, Db> {
     query_builder: PhantomData<Qb>,
@@ -46,6 +47,17 @@ where
         Ok(maybe_entity.map(|i| i.into()))
     }
 
+    pub async fn list<'e, T, E>(&self, executor: E, filter: Filter<T>) -> Result<Vec<T>, sqlx::Error>
+    where
+        E: Executor<'e, Database = Db>,
+        T: ListQuery,
+        <T as ListQuery>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+    {
+        let query = <T as ListQuery>::list_query(filter).to_string(Qb::default());
+        let entities: Vec<<T as ListQuery>::Row> = sqlx::query_as(&query).fetch_all(executor).await?;
+        Ok(entities.into_iter().map(|i| i.into()).collect())
+    }
+
     pub async fn create<'e, T, E>(&self, executor: E, input: <T as CreateQuery>::Create) -> Result<T, sqlx::Error>
     where
         E: Executor<'e, Database = Db>,
@@ -57,7 +69,12 @@ where
         Ok(entity.into())
     }
 
-    pub async fn update<'e, T, E>(&self, executor: E, id: <T as UpdateQuery>::Pk, input: <T as UpdateQuery>::Update) -> Result<Option<T>, sqlx::Error>
+    pub async fn update<'e, T, E>(
+        &self,
+        executor: E,
+        id: <T as UpdateQuery>::Pk,
+        input: <T as UpdateQuery>::Update,
+    ) -> Result<Option<T>, sqlx::Error>
     where
         E: Executor<'e, Database = Db>,
         T: UpdateQuery,
