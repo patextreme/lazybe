@@ -11,6 +11,9 @@ pub struct DbCtx<Qb, Db> {
 }
 
 #[cfg(feature = "sqlite")]
+pub type SqliteDbCtx = DbCtx<sea_query::SqliteQueryBuilder, sqlx::Sqlite>;
+
+#[cfg(feature = "sqlite")]
 impl DbCtx<sea_query::SqliteQueryBuilder, sqlx::Sqlite> {
     pub fn sqlite() -> Self {
         DbCtx {
@@ -19,6 +22,9 @@ impl DbCtx<sea_query::SqliteQueryBuilder, sqlx::Sqlite> {
         }
     }
 }
+
+#[cfg(feature = "postgres")]
+pub type PostgresDbCtx = DbCtx<sea_query::PostgresQueryBuilder, sqlx::Postgres>;
 
 #[cfg(feature = "postgres")]
 impl DbCtx<sea_query::PostgresQueryBuilder, sqlx::Postgres> {

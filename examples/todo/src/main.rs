@@ -1,5 +1,5 @@
-use lazybe::DbCtx;
 use lazybe::filter::Filter;
+use lazybe::{DbCtx, SqliteDbCtx};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 
@@ -53,7 +53,7 @@ pub enum Status {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let pool = SqlitePool::connect("sqlite::memory:").await?;
-    let ctx = DbCtx::sqlite();
+    let ctx: SqliteDbCtx = DbCtx::sqlite();
     run_migration(&pool).await?;
 
     let alice: Staff = ctx
@@ -65,10 +65,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .await?;
 
-    let todo_defs = [
-        ("Do homework", Status::Doing),
-        ("Wash car", Status::Todo),
-    ];
+    let todo_defs = [("Do homework", Status::Doing), ("Wash car", Status::Todo)];
     for (title, status) in todo_defs {
         ctx.create::<Todo, _>(
             &pool,

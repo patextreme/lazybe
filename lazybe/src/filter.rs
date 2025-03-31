@@ -32,6 +32,7 @@ impl<Entity> Filter<Entity> {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn not(self) -> Self {
         Self {
             cond: self.cond.not(),
