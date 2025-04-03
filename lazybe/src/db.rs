@@ -13,6 +13,18 @@ pub struct DbCtx<Qb, Db> {
     db: PhantomData<Db>,
 }
 
+impl<Qb, Db> Clone for DbCtx<Qb, Db>
+where
+    Qb: Default,
+{
+    fn clone(&self) -> Self {
+        Self {
+            query_builder: Default::default(),
+            db: PhantomData,
+        }
+    }
+}
+
 #[cfg(feature = "sqlite")]
 pub type SqliteDbCtx = DbCtx<sea_query::SqliteQueryBuilder, sqlx::Sqlite>;
 

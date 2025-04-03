@@ -7,4 +7,5 @@ mod db;
 pub mod filter;
 mod page;
 mod query;
+pub mod router;
 pub mod sort;

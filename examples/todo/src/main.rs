@@ -1,13 +1,14 @@
-use lazybe::filter::Filter;
-use lazybe::sort::Sort;
+use lazybe::router::{GetRoutable, RouterState};
 use lazybe::{DbCtx, SqliteDbCtx};
+use sea_query::SqliteQueryBuilder;
+use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalNewtype)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalNewtype)]
 pub struct StaffId(u64);
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalEntity)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalEntity)]
 #[lazybe(table = "staff")]
 pub struct Staff {
     #[lazybe(primary_key)]
@@ -19,10 +20,10 @@ pub struct Staff {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalNewtype)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalNewtype)]
 pub struct TodoId(u64);
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalEntity)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalEntity)]
 #[lazybe(table = "todo")]
 pub struct Todo {
     #[lazybe(primary_key)]
@@ -37,7 +38,7 @@ pub struct Todo {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalEnum)]
 pub enum Status {
     Backlog,
     Todo,
@@ -45,69 +46,42 @@ pub enum Status {
     Done,
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let pool = SqlitePool::connect("sqlite::memory:").await?;
-    let ctx: SqliteDbCtx = DbCtx::sqlite();
-    run_migration(&pool).await?;
+#[derive(Clone)]
+struct AppState {
+    ctx: SqliteDbCtx,
+    pool: SqlitePool,
+}
 
-    let alice: Staff = ctx
-        .create(
-            &pool,
-            CreateStaff {
-                name: "Alice".to_string(),
-            },
-        )
-        .await?;
+impl RouterState for AppState {
+    type Qb = SqliteQueryBuilder;
+    type Db = Sqlite;
 
-    let todo_defs = [("Do homework", Status::Doing), ("Wash car", Status::Todo)];
-    for (title, status) in todo_defs {
-        ctx.create::<Todo, _>(
-            &pool,
-            CreateTodo {
-                title: title.to_string(),
-                description: None,
-                status,
-                assignee: Some(alice.id.clone()),
-            },
-        )
-        .await?;
+    fn db_pool(&self) -> Pool<Self::Db> {
+        self.pool.clone()
     }
 
-    let tasks = ctx.list_all::<Todo, _>(&pool, Filter::empty(), Sort::empty()).await?;
-    println!(">>>>> All tasks <<<<<\n{:#?}", tasks);
+    fn db_ctx(&self) -> DbCtx<Self::Qb, Self::Db> {
+        self.ctx.clone()
+    }
+}
 
-    // Alice pick up a task and complete it
-    let alice_incomplete_tasks = ctx
-        .list_all::<Todo, _>(
-            &pool,
-            Filter::all([
-                TodoFilter::assignee().eq(Some(alice.id.clone())),
-                TodoFilter::status().neq(Status::Done),
-            ]),
-            Sort::empty(),
-        )
-        .await?;
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-    ctx.update::<Todo, _>(
-        &pool,
-        alice_incomplete_tasks.first().cloned().unwrap().id,
-        UpdateTodo {
-            status: Some(Status::Done),
-            ..Default::default()
-        },
-    )
-    .await?;
+impl GetRoutable for Todo {
+    fn get_route() -> &'static str {
+        "/todos/{id}"
+    }
+}
 
-    let completed_tasks = ctx
-        .list_all(
-            &pool,
-            Filter::all([TodoFilter::status().eq(Status::Done)]),
-            Sort::empty(),
-        )
-        .await?;
-    println!(">>>>> Completed tasks <<<<<\n{:#?}", completed_tasks);
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let ctx: SqliteDbCtx = DbCtx::sqlite();
+    let pool = SqlitePool::connect("sqlite::memory:").await?;
+    run_migration(&pool).await?;
 
+    let state = AppState { ctx, pool };
+
+    let app = axum::Router::new().with_state(state);
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    axum::serve(listener, app).await?;
     Ok(())
 }
 
