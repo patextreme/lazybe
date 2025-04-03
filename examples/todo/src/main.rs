@@ -1,15 +1,15 @@
+use lazybe::axum::GetRouter;
 use lazybe::axum::sqlite::ToSqliteAxumState;
-use lazybe::axum::{GetRoutable, GetRouter};
 use lazybe::{DbCtx, SqliteDbCtx};
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalNewtype)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Newtype)]
 pub struct TodoId(u64);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalEntity)]
-#[lazybe(table = "todo")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Entity)]
+#[lazybe(table = "todo", url_slug = "todos")]
 pub struct Todo {
     #[lazybe(primary_key)]
     pub id: TodoId,
@@ -22,7 +22,7 @@ pub struct Todo {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Enum)]
 pub enum Status {
     Backlog,
     Todo,
@@ -39,12 +39,6 @@ struct AppState {
 impl ToSqliteAxumState for AppState {
     fn to_sqlite_state(&self) -> (lazybe::SqliteDbCtx, sqlx::Pool<sqlx::Sqlite>) {
         (self.ctx.clone(), self.pool.clone())
-    }
-}
-
-impl GetRoutable for Todo {
-    fn get_route() -> &'static str {
-        "/todos/{id}"
     }
 }
 

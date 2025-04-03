@@ -8,6 +8,8 @@ use syn::{Data, DataStruct, DeriveInput, Field, Fields, FieldsNamed, Ident, Visi
 #[darling(attributes(lazybe))]
 struct EntityAttr {
     table: String,
+    #[darling(default)]
+    url_slug: Option<String>,
 }
 
 #[derive(Clone, FromField)]
@@ -191,8 +193,10 @@ fn expand_struct(input: &DeriveInput, data_struct: &DataStruct) -> syn::Result<T
             let entity_types_impl = entity_types_impl(&entity_meta);
             let entity_row_impl = entity_row_impl(&entity_meta);
             let entity_query_trait_impl = entity_query_trait_impl(&entity_meta);
+            let entity_route_trailt_impl = entity_route_trait_impl(&entity_meta);
             Ok(quote! {
                 #entity_types_impl
+                #entity_route_trailt_impl
                 #entity_query_trait_impl
                 #entity_row_impl
             })
@@ -324,6 +328,21 @@ fn entity_row_impl(entity_meta: &EntityMeta) -> TokenStream {
         enum #sea_query_ident {
             Table,
             #(#all_field_idents),*
+        }
+    }
+}
+
+fn entity_route_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
+    let entity = &entity_meta.entity_ident;
+    let Some(base_url) = entity_meta.entity_attr.url_slug.as_ref() else {
+        return TokenStream::new();
+    };
+    let get_route = format!("/{}/{{id}}", base_url);
+    quote! {
+        impl lazybe::axum::GetRoutable for #entity {
+            fn get_route() -> &'static str {
+                #get_route
+            }
         }
     }
 }

@@ -38,7 +38,10 @@ pub mod sqlite {
         }
     }
 
-    async fn get_router_impl<T, S>(Path(id): Path<<T as GetQuery>::Pk>, State(state): State<S>) -> Result<Json<T>, StatusCode>
+    async fn get_router_impl<T, S>(
+        Path(id): Path<<T as GetQuery>::Pk>,
+        State(state): State<S>,
+    ) -> Result<Json<T>, StatusCode>
     where
         T: GetQuery + GetRoutable + Serialize + DeserializeOwned + 'static,
         S: ToSqliteAxumState + Clone + Send + Sync + 'static,

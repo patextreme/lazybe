@@ -9,7 +9,12 @@ axum = { workspace = true }
 lazybe = { workspace = true, features = ["sqlite", "postgres"] }
 sea-query = { workspace = true, features = ["with-chrono"] }
 serde = { workspace = true }
-sqlx = { workspace = true, features = ["runtime-tokio", "chrono", "sqlite", "postgres"] }
+sqlx = { workspace = true, features = [
+  "runtime-tokio",
+  "chrono",
+  "sqlite",
+  "postgres",
+] }
 
 anyhow = { version = "1" }
 chrono = { version = "0.4", features = ["serde"] }
