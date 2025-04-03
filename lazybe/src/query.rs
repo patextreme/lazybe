@@ -19,9 +19,10 @@ pub trait CreateQuery {
 
 pub trait UpdateQuery {
     type Pk;
-    type Update;
+    type Patch;
+    type Put: Into<Self::Patch>;
     type Row;
-    fn update_query(id: Self::Pk, input: Self::Update) -> sea_query::UpdateStatement;
+    fn update_query(id: Self::Pk, input: Self::Patch) -> sea_query::UpdateStatement;
 }
 
 pub trait DeleteQuery {

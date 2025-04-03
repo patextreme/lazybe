@@ -165,30 +165,53 @@ mod macros {
                 T: UpdateQuery + Routable + Serialize + 'static,
                 S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as UpdateQuery>::Pk: DeserializeOwned + Send,
-                <T as UpdateQuery>::Update: DeserializeOwned + Send,
+                <T as UpdateQuery>::Patch: DeserializeOwned + Send,
+                <T as UpdateQuery>::Put: DeserializeOwned + Send,
                 <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 fn update_router() -> Router<S> {
                     let route = <T as Routable>::entity_path();
-                    Router::new().route(route, patch(update_router_impl::<T, S>))
+                    Router::new().route(route, patch(patch_router_impl::<T, S>).put(put_router_impl::<T, S>))
                 }
             }
 
-            async fn update_router_impl<T, S>(
+            async fn patch_router_impl<T, S>(
                 Path(id): Path<<T as UpdateQuery>::Pk>,
                 State(state): State<S>,
-                Json(input): Json<<T as UpdateQuery>::Update>,
+                Json(input): Json<<T as UpdateQuery>::Patch>,
             ) -> Result<Json<T>, StatusCode>
             where
                 T: UpdateQuery + Routable + Serialize + 'static,
                 S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as UpdateQuery>::Pk: DeserializeOwned + Send,
-                <T as UpdateQuery>::Update: DeserializeOwned + Send,
+                <T as UpdateQuery>::Patch: DeserializeOwned + Send,
                 <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 let (ctx, pool) = state.to_db_state();
                 let result = ctx
                     .update::<T, _>(&pool, id, input)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                    .ok_or(StatusCode::NOT_FOUND)?;
+                Ok(Json(result))
+            }
+
+            async fn put_router_impl<T, S>(
+                Path(id): Path<<T as UpdateQuery>::Pk>,
+                State(state): State<S>,
+                Json(input): Json<<T as UpdateQuery>::Put>,
+            ) -> Result<Json<T>, StatusCode>
+            where
+                T: UpdateQuery + Routable + Serialize + 'static,
+                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                <T as UpdateQuery>::Pk: DeserializeOwned + Send,
+                <T as UpdateQuery>::Put: DeserializeOwned + Send,
+                <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
+            {
+                let (ctx, pool) = state.to_db_state();
+                let patch_input: <T as UpdateQuery>::Patch = input.into();
+                let result = ctx
+                    .update::<T, _>(&pool, id, patch_input)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
                     .ok_or(StatusCode::NOT_FOUND)?;
