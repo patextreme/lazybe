@@ -1,4 +1,4 @@
-use lazybe::axum::{GetRouter, ToDbState};
+use lazybe::axum::{CreateRouter, GetRouter, ToDbState};
 use lazybe::sqlite::SqliteDbCtx;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
@@ -8,7 +8,7 @@ use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 pub struct TodoId(u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Entity)]
-#[lazybe(table = "todo", endpoint = "todos")]
+#[lazybe(table = "todo", endpoint = "/todos")]
 pub struct Todo {
     #[lazybe(primary_key)]
     pub id: TodoId,
@@ -47,11 +47,15 @@ impl ToDbState for AppState {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let ctx = SqliteDbCtx;
-    let pool = SqlitePool::connect("sqlite::memory:").await?;
+    // let pool = SqlitePool::connect("sqlite::memory:").await?;
+    let pool = SqlitePool::connect("sqlite://test.db").await?;
     run_migration(&pool).await?;
 
     let state = AppState { ctx, pool };
-    let app = axum::Router::new().merge(Todo::get_router()).with_state(state);
+    let app = axum::Router::new()
+        .merge(Todo::get_router())
+        .merge(Todo::create_router())
+        .with_state(state);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await?;
     Ok(())
@@ -60,19 +64,11 @@ async fn main() -> anyhow::Result<()> {
 async fn run_migration(pool: &Pool<Sqlite>) -> anyhow::Result<()> {
     pool.execute(
         r#"
-CREATE TABLE IF NOT EXISTS staff (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS todo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     description TEXT,
     status TEXT NOT NULL,
-    assignee INTEGER REFERENCES staff(id) ON DELETE RESTRICT,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL
 );

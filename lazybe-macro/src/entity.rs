@@ -260,12 +260,12 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
             }
         });
     quote! {
-        #[derive(Clone)]
+        #[derive(Clone, serde::Serialize, serde::Deserialize)]
         #entity_vis struct #create_entity {
             #(#user_defined_field_defs),*
         }
 
-        #[derive(Default, Clone)]
+        #[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
         #entity_vis struct #update_entity {
             #(#update_entity_field_defs),*
         }
@@ -337,11 +337,15 @@ fn entity_route_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let Some(base_url) = entity_meta.entity_attr.endpoint.as_ref() else {
         return TokenStream::new();
     };
-    let get_route = format!("/{}/{{id}}", base_url);
+    let get_path = format!("{}/{{id}}", base_url);
+    let list_path = format!("{}", base_url);
     quote! {
         impl lazybe::axum::Routable for #entity {
-            fn get_route() -> &'static str {
-                #get_route
+            fn entity_path() -> &'static str {
+                #get_path
+            }
+            fn entity_collection_path() -> &'static str {
+                #list_path
             }
         }
     }
