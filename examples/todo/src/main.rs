@@ -1,4 +1,4 @@
-use lazybe::axum::{CreateRouter, DeleteRouter, GetRouter, ToDbState};
+use lazybe::axum::{CreateRouter, DeleteRouter, GetRouter, ToDbState, UpdateRouter};
 use lazybe::sqlite::SqliteDbCtx;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
@@ -55,6 +55,7 @@ async fn main() -> anyhow::Result<()> {
     let app = axum::Router::new()
         .merge(Todo::get_router())
         .merge(Todo::create_router())
+        .merge(Todo::update_router())
         .merge(Todo::delete_router())
         .with_state(state);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();

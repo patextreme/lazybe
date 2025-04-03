@@ -16,6 +16,10 @@ pub trait CreateRouter<S, Db> {
     fn create_router() -> Router<S>;
 }
 
+pub trait UpdateRouter<S, Db> {
+    fn update_router() -> Router<S>;
+}
+
 pub trait DeleteRouter<S, Db> {
     fn delete_router() -> Router<S>;
 }
@@ -31,14 +35,14 @@ pub trait ToDbState {
 pub mod sqlite {
     use axum::extract::{Path, State};
     use axum::http::StatusCode;
-    use axum::routing::{delete, get, post};
+    use axum::routing::{delete, get, patch, post};
     use axum::{Json, Router};
     use serde::Serialize;
     use serde::de::DeserializeOwned;
     use sqlx::{Database, FromRow};
 
-    use super::{CreateRouter, DeleteRouter, GetRouter, Routable, ToDbState};
-    use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery};
+    use super::{CreateRouter, DeleteRouter, GetRouter, Routable, ToDbState, UpdateRouter};
+    use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery, UpdateQuery};
 
     super::macros::axum_route_impl!(sqlx::Sqlite, crate::db::sqlite::SqliteDbCtx);
 }
@@ -47,14 +51,14 @@ pub mod sqlite {
 pub mod postgres {
     use axum::extract::{Path, State};
     use axum::http::StatusCode;
-    use axum::routing::{delete, get, post};
+    use axum::routing::{delete, get, patch, post};
     use axum::{Json, Router};
     use serde::Serialize;
     use serde::de::DeserializeOwned;
     use sqlx::{Database, FromRow};
 
-    use super::{CreateRouter, DeleteRouter, GetRouter, Routable, ToDbState};
-    use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery};
+    use super::{CreateRouter, DeleteRouter, GetRouter, Routable, ToDbState, UpdateRouter};
+    use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery, UpdateQuery};
 
     super::macros::axum_route_impl!(sqlx::Postgres, crate::db::postgres::PostgresDbCtx);
 }
@@ -154,6 +158,41 @@ mod macros {
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
                 Ok(Json(()))
+            }
+
+            impl<T, S> UpdateRouter<S, DbImpl> for T
+            where
+                T: UpdateQuery + Routable + Serialize + 'static,
+                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                <T as UpdateQuery>::Pk: DeserializeOwned + Send,
+                <T as UpdateQuery>::Update: DeserializeOwned + Send,
+                <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
+            {
+                fn update_router() -> Router<S> {
+                    let route = <T as Routable>::entity_path();
+                    Router::new().route(route, patch(update_router_impl::<T, S>))
+                }
+            }
+
+            async fn update_router_impl<T, S>(
+                Path(id): Path<<T as UpdateQuery>::Pk>,
+                State(state): State<S>,
+                Json(input): Json<<T as UpdateQuery>::Update>,
+            ) -> Result<Json<T>, StatusCode>
+            where
+                T: UpdateQuery + Routable + Serialize + 'static,
+                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                <T as UpdateQuery>::Pk: DeserializeOwned + Send,
+                <T as UpdateQuery>::Update: DeserializeOwned + Send,
+                <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
+            {
+                let (ctx, pool) = state.to_db_state();
+                let result = ctx
+                    .update::<T, _>(&pool, id, input)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+                    .ok_or(StatusCode::NOT_FOUND)?;
+                Ok(Json(result))
             }
         };
     }
