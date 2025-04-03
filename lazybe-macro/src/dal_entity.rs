@@ -28,6 +28,7 @@ struct EntityMeta {
     create_entity: Ident,
     update_entity: Ident,
     filter_entity: Ident,
+    sort_entity: Ident,
     sqlx_row_ident: Ident,
     sea_query_ident: Ident,
     primary_key: Field,
@@ -108,6 +109,7 @@ impl EntityMeta {
             create_entity: format_ident!("Create{}", input.ident),
             update_entity: format_ident!("Update{}", input.ident),
             filter_entity: format_ident!("{}Filter", input.ident),
+            sort_entity: format_ident!("{}Sort", input.ident),
             sqlx_row_ident: format_ident!("{}SqlxRow", input.ident),
             sea_query_ident: format_ident!("{}SeaQueryIdent", input.ident),
             primary_key: Self::detect_primary_key(&input.ident, &parsed_fields)?,
@@ -144,7 +146,7 @@ impl EntityMeta {
                 match maybe_field {
                     Some(_) => Err(syn::Error::new_spanned(
                         entity,
-                        "No more then 1 field can be created_at",
+                        "No more than 1 field can be created_at",
                     ))?,
                     None => maybe_field = Some(field.clone()),
                 }
@@ -160,7 +162,7 @@ impl EntityMeta {
                 match maybe_field {
                     Some(_) => Err(syn::Error::new_spanned(
                         entity,
-                        "No more then 1 field can be updated_at",
+                        "No more than 1 field can be updated_at",
                     ))?,
                     None => maybe_field = Some(field.clone()),
                 }
@@ -213,6 +215,7 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
     let create_entity = &entity_meta.create_entity;
     let update_entity = &entity_meta.update_entity;
     let filter_entity = &entity_meta.filter_entity;
+    let sort_entity = &entity_meta.sort_entity;
     let user_defined_field_defs = entity_meta.user_defined_fields.iter().map(|f| {
         let field_vis = &f.0.vis;
         let field_ident = f.0.ident.as_ref().unwrap();
@@ -239,20 +242,42 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
                 }
             }
         });
+    let sort_method_defs = entity_meta
+        .all_fields
+        .iter()
+        .map(|(f, _)| f)
+        .zip(entity_meta.all_fields_ident_pascal())
+        .map(|(f, field_ident_pascal)| {
+            let field_ident = f.ident.as_ref().unwrap();
+            quote! {
+                pub fn #field_ident() -> lazybe::sort::SortCol<#entity> {
+                    lazybe::sort::SortCol::new(#entity_sea_query_ident::#field_ident_pascal)
+                }
+            }
+        });
     quote! {
         #[derive(Clone)]
         #entity_vis struct #create_entity {
             #(#user_defined_field_defs),*
         }
+
         #[derive(Default, Clone)]
         #entity_vis struct #update_entity {
             #(#update_entity_field_defs),*
         }
+
         #[derive(Clone)]
         #entity_vis struct #filter_entity;
 
         impl #filter_entity {
             #(#filter_method_defs)*
+        }
+
+        #[derive(Clone)]
+        #entity_vis struct #sort_entity;
+
+        impl #sort_entity {
+            #(#sort_method_defs)*
         }
     }
 }

@@ -82,6 +82,7 @@ impl<Entity> FilterExpr<Entity> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct FilterCol<Entity, Col> {
     col_expr: Expr,
     entity: PhantomData<Entity>,
@@ -187,10 +188,8 @@ where
 
 pub trait LikeFilterable {}
 impl LikeFilterable for String {}
-impl LikeFilterable for &String {}
 impl LikeFilterable for &str {}
 impl LikeFilterable for Option<String> {}
-impl LikeFilterable for Option<&String> {}
 impl LikeFilterable for Option<&str> {}
 
 pub trait IsNullFilterable {}

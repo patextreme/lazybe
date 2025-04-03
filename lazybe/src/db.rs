@@ -1,9 +1,12 @@
 use std::marker::PhantomData;
 
+use projection::CountResult;
+use sea_query::{Alias, Asterisk, Expr};
 use sqlx::{Database, Executor, FromRow, IntoArguments};
 
 use crate::filter::Filter;
-use crate::{CreateQuery, DeleteQuery, GetQuery, ListQuery, UpdateQuery};
+use crate::sort::Sort;
+use crate::{CreateQuery, DeleteQuery, GetQuery, ListQuery, Page, Pagination, UpdateQuery};
 
 pub struct DbCtx<Qb, Db> {
     query_builder: PhantomData<Qb>,
@@ -53,15 +56,61 @@ where
         Ok(maybe_entity.map(|i| i.into()))
     }
 
-    pub async fn list<'e, T, E>(&self, executor: E, filter: Filter<T>) -> Result<Vec<T>, sqlx::Error>
+    pub async fn list_all<'e, T, E>(&self, executor: E, filter: Filter<T>, sort: Sort<T>) -> Result<Vec<T>, sqlx::Error>
     where
-        E: Executor<'e, Database = Db>,
+        E: Executor<'e, Database = Db> + Clone,
         T: ListQuery,
         <T as ListQuery>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+        CountResult: for<'r> FromRow<'r, Db::Row> + Send + Unpin,
     {
-        let query = <T as ListQuery>::list_query(filter).to_string(Qb::default());
-        let entities: Vec<<T as ListQuery>::Row> = sqlx::query_as(&query).fetch_all(executor).await?;
-        Ok(entities.into_iter().map(|i| i.into()).collect())
+        let page_result = self.list_page(executor, filter, sort, None).await?;
+        Ok(page_result.data)
+    }
+
+    pub async fn list_page<'e, T, E>(
+        &self,
+        executor: E,
+        filter: Filter<T>,
+        sort: Sort<T>,
+        pagination: Option<Pagination>,
+    ) -> Result<Page<T>, sqlx::Error>
+    where
+        E: Executor<'e, Database = Db> + Clone,
+        T: ListQuery,
+        <T as ListQuery>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+        CountResult: for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+    {
+        let mut base_query = <T as ListQuery>::list_query(filter);
+
+        // count
+        let count_query = {
+            let mut stm = base_query.clone();
+            stm.clear_selects()
+                .clear_order_by()
+                .expr_as(Expr::col(Asterisk).count(), Alias::new("count"));
+            stm.to_owned().to_string(Qb::default())
+        };
+
+        // data
+        let data_query = {
+            // sort
+            let order_by = sort.into_order_exprs();
+            base_query = base_query.order_by_columns(order_by).to_owned();
+
+            // filter
+            if let Some(p) = pagination {
+                base_query = base_query.limit(p.limit).offset(p.offset()).to_owned();
+            }
+            base_query.to_string(Qb::default())
+        };
+
+        let data_result: Vec<<T as ListQuery>::Row> = sqlx::query_as(&data_query).fetch_all(executor.clone()).await?;
+        let count_result: CountResult = sqlx::query_as(&count_query).fetch_one(executor).await?;
+        let result = Page {
+            data: data_result.into_iter().map(|i| i.into()).collect(),
+            total: count_result.count,
+        };
+        Ok(result)
     }
 
     pub async fn create<'e, T, E>(&self, executor: E, input: <T as CreateQuery>::Create) -> Result<T, sqlx::Error>
@@ -99,5 +148,12 @@ where
         let query = <T as DeleteQuery>::delete_query(id).to_string(Qb::default());
         sqlx::query(&query).execute(executor).await?;
         Ok(())
+    }
+}
+
+mod projection {
+    #[derive(sqlx::FromRow)]
+    pub struct CountResult {
+        pub count: u64,
     }
 }

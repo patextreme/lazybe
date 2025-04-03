@@ -1,4 +1,5 @@
 use lazybe::filter::Filter;
+use lazybe::sort::Sort;
 use lazybe::{DbCtx, SqliteDbCtx};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
@@ -20,12 +21,6 @@ pub struct Staff {
 
 #[derive(Debug, Clone, PartialEq, Eq, lazybe::DalNewtype)]
 pub struct TodoId(u64);
-
-impl From<TodoId> for u64 {
-    fn from(value: TodoId) -> Self {
-        value.0
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, lazybe::DalEntity)]
 #[lazybe(table = "todo")]
@@ -79,17 +74,18 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     }
 
-    let tasks = ctx.list::<Todo, _>(&pool, Filter::empty()).await?;
+    let tasks = ctx.list_all::<Todo, _>(&pool, Filter::empty(), Sort::empty()).await?;
     println!(">>>>> All tasks <<<<<\n{:#?}", tasks);
 
     // Alice pick up a task and complete it
     let alice_incomplete_tasks = ctx
-        .list::<Todo, _>(
+        .list_all::<Todo, _>(
             &pool,
             Filter::all([
                 TodoFilter::assignee().eq(Some(alice.id.clone())),
                 TodoFilter::status().neq(Status::Done),
             ]),
+            Sort::empty(),
         )
         .await?;
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
@@ -104,7 +100,11 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
     let completed_tasks = ctx
-        .list(&pool, Filter::all([TodoFilter::status().eq(Status::Done)]))
+        .list_all(
+            &pool,
+            Filter::all([TodoFilter::status().eq(Status::Done)]),
+            Sort::empty(),
+        )
         .await?;
     println!(">>>>> Completed tasks <<<<<\n{:#?}", completed_tasks);
 
