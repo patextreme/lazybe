@@ -102,7 +102,7 @@ where
         &self,
         executor: E,
         id: <T as UpdateQuery>::Pk,
-        input: <T as UpdateQuery>::Patch,
+        input: <T as UpdateQuery>::Update,
     ) -> impl Future<Output = Result<Option<T>, sqlx::Error>> + Send
     where
         E: Executor<'e, Database = Db>,
@@ -231,7 +231,7 @@ where
         &self,
         executor: E,
         id: <T as UpdateQuery>::Pk,
-        input: <T as UpdateQuery>::Patch,
+        input: <T as UpdateQuery>::Update,
     ) -> impl Future<Output = Result<Option<T>, sqlx::Error>> + Send
     where
         E: Executor<'e, Database = Db>,

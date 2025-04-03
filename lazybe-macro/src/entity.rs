@@ -28,8 +28,8 @@ struct EntityMeta {
     entity_vis: Visibility,
     entity_attr: EntityAttr,
     create_entity: Ident,
-    patch_entity: Ident,
-    put_entity: Ident,
+    update_entity: Ident,
+    replace_entity: Ident,
     filter_entity: Ident,
     sort_entity: Ident,
     sqlx_row_ident: Ident,
@@ -110,8 +110,8 @@ impl EntityMeta {
             entity_vis: input.vis.clone(),
             entity_attr: EntityAttr::from_derive_input(input)?,
             create_entity: format_ident!("Create{}", input.ident),
-            patch_entity: format_ident!("Patch{}", input.ident),
-            put_entity: format_ident!("Put{}", input.ident),
+            update_entity: format_ident!("Update{}", input.ident),
+            replace_entity: format_ident!("Replace{}", input.ident),
             filter_entity: format_ident!("{}Filter", input.ident),
             sort_entity: format_ident!("{}Sort", input.ident),
             sqlx_row_ident: format_ident!("{}SqlxRow", input.ident),
@@ -219,8 +219,8 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
     let entity_vis = &entity_meta.entity_vis;
     let entity_sea_query_ident = &entity_meta.sea_query_ident;
     let create_entity = &entity_meta.create_entity;
-    let patch_entity = &entity_meta.patch_entity;
-    let put_entity = &entity_meta.put_entity;
+    let patch_entity = &entity_meta.update_entity;
+    let put_entity = &entity_meta.replace_entity;
     let filter_entity = &entity_meta.filter_entity;
     let sort_entity = &entity_meta.sort_entity;
     let user_defined_field_defs = entity_meta.user_defined_fields.iter().map(|f| {
@@ -364,7 +364,7 @@ fn entity_route_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
         return TokenStream::new();
     };
     let get_path = format!("{}/{{id}}", base_url);
-    let list_path = format!("{}", base_url);
+    let list_path = base_url.to_string();
     quote! {
         impl lazybe::axum::Routable for #entity {
             fn entity_path() -> &'static str {
@@ -446,8 +446,8 @@ fn create_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
 
 fn update_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let entity = &entity_meta.entity_ident;
-    let patch_entity = &entity_meta.patch_entity;
-    let put_entity = &entity_meta.put_entity;
+    let update_entity = &entity_meta.update_entity;
+    let replace_entity = &entity_meta.replace_entity;
     let sqlx_row_ident = &entity_meta.sqlx_row_ident;
     let sea_query_ident = &entity_meta.sea_query_ident;
     let pk_ty = &entity_meta.primary_key.ty;
@@ -474,10 +474,10 @@ fn update_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     quote! {
         impl lazybe::UpdateQuery for #entity {
             type Pk = #pk_ty;
-            type Patch = #patch_entity;
-            type Put = #put_entity;
+            type Update = #update_entity;
+            type Replace = #replace_entity;
             type Row = #sqlx_row_ident;
-            fn update_query(id: Self::Pk, input: Self::Patch) -> sea_query::UpdateStatement {
+            fn update_query(id: Self::Pk, input: Self::Update) -> sea_query::UpdateStatement {
                 #now_value
 
                 let mut values = Vec::new();

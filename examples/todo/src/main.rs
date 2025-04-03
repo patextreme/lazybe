@@ -47,16 +47,16 @@ impl ToDbState for AppState {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let ctx = SqliteDbCtx;
-    // let pool = SqlitePool::connect("sqlite::memory:").await?;
-    let pool = SqlitePool::connect("sqlite://test.db").await?;
+    let pool = SqlitePool::connect("sqlite::memory:").await?;
     run_migration(&pool).await?;
 
     let state = AppState { ctx, pool };
     let app = axum::Router::new()
-        .merge(Todo::get_router())
-        .merge(Todo::create_router())
-        .merge(Todo::update_router())
-        .merge(Todo::delete_router())
+        .merge(Todo::get_endpoint())
+        .merge(Todo::create_endpoint())
+        .merge(Todo::replace_endpoint())
+        .merge(Todo::update_endpoint())
+        .merge(Todo::delete_endpoint())
         .with_state(state);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await?;

@@ -9,19 +9,20 @@ pub trait Routable {
 }
 
 pub trait GetRouter<S, Db> {
-    fn get_router() -> Router<S>;
+    fn get_endpoint() -> Router<S>;
 }
 
 pub trait CreateRouter<S, Db> {
-    fn create_router() -> Router<S>;
+    fn create_endpoint() -> Router<S>;
 }
 
 pub trait UpdateRouter<S, Db> {
-    fn update_router() -> Router<S>;
+    fn update_endpoint() -> Router<S>;
+    fn replace_endpoint() -> Router<S>;
 }
 
 pub trait DeleteRouter<S, Db> {
-    fn delete_router() -> Router<S>;
+    fn delete_endpoint() -> Router<S>;
 }
 
 pub trait ToDbState {
@@ -35,7 +36,7 @@ pub trait ToDbState {
 pub mod sqlite {
     use axum::extract::{Path, State};
     use axum::http::StatusCode;
-    use axum::routing::{delete, get, patch, post};
+    use axum::routing::{delete, get, patch, post, put};
     use axum::{Json, Router};
     use serde::Serialize;
     use serde::de::DeserializeOwned;
@@ -51,7 +52,7 @@ pub mod sqlite {
 pub mod postgres {
     use axum::extract::{Path, State};
     use axum::http::StatusCode;
-    use axum::routing::{delete, get, patch, post};
+    use axum::routing::{delete, get, patch, post, put};
     use axum::{Json, Router};
     use serde::Serialize;
     use serde::de::DeserializeOwned;
@@ -76,13 +77,13 @@ mod macros {
                 <T as GetQuery>::Pk: DeserializeOwned + Send,
                 <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
-                fn get_router() -> Router<S> {
+                fn get_endpoint() -> Router<S> {
                     let route = <T as Routable>::entity_path();
-                    Router::new().route(route, get(get_router_impl::<T, S>))
+                    Router::new().route(route, get(get_endpoint_impl::<T, S>))
                 }
             }
 
-            async fn get_router_impl<T, S>(
+            async fn get_endpoint_impl<T, S>(
                 Path(id): Path<<T as GetQuery>::Pk>,
                 State(state): State<S>,
             ) -> Result<Json<T>, StatusCode>
@@ -108,13 +109,13 @@ mod macros {
                 <T as CreateQuery>::Create: DeserializeOwned + Send,
                 <T as CreateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
-                fn create_router() -> Router<S> {
+                fn create_endpoint() -> Router<S> {
                     let route = <T as Routable>::entity_collection_path();
-                    Router::new().route(route, post(create_router_impl::<T, S>))
+                    Router::new().route(route, post(create_endpoint_impl::<T, S>))
                 }
             }
 
-            async fn create_router_impl<T, S>(
+            async fn create_endpoint_impl<T, S>(
                 State(state): State<S>,
                 Json(input): Json<<T as CreateQuery>::Create>,
             ) -> Result<Json<T>, StatusCode>
@@ -138,13 +139,13 @@ mod macros {
                 S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as DeleteQuery>::Pk: DeserializeOwned + Send,
             {
-                fn delete_router() -> Router<S> {
+                fn delete_endpoint() -> Router<S> {
                     let route = <T as Routable>::entity_path();
-                    Router::new().route(route, delete(delete_router_impl::<T, S>))
+                    Router::new().route(route, delete(delete_endpoint_impl::<T, S>))
                 }
             }
 
-            async fn delete_router_impl<T, S>(
+            async fn delete_endpoint_impl<T, S>(
                 Path(id): Path<<T as DeleteQuery>::Pk>,
                 State(state): State<S>,
             ) -> Result<Json<()>, StatusCode>
@@ -165,26 +166,31 @@ mod macros {
                 T: UpdateQuery + Routable + Serialize + 'static,
                 S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as UpdateQuery>::Pk: DeserializeOwned + Send,
-                <T as UpdateQuery>::Patch: DeserializeOwned + Send,
-                <T as UpdateQuery>::Put: DeserializeOwned + Send,
+                <T as UpdateQuery>::Update: DeserializeOwned + Send,
+                <T as UpdateQuery>::Replace: DeserializeOwned + Send,
                 <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
-                fn update_router() -> Router<S> {
+                fn replace_endpoint() -> Router<S> {
                     let route = <T as Routable>::entity_path();
-                    Router::new().route(route, patch(patch_router_impl::<T, S>).put(put_router_impl::<T, S>))
+                    Router::new().route(route, put(replace_endpoint_impl::<T, S>))
+                }
+
+                fn update_endpoint() -> Router<S> {
+                    let route = <T as Routable>::entity_path();
+                    Router::new().route(route, patch(update_endpoint_impl::<T, S>))
                 }
             }
 
-            async fn patch_router_impl<T, S>(
+            async fn update_endpoint_impl<T, S>(
                 Path(id): Path<<T as UpdateQuery>::Pk>,
                 State(state): State<S>,
-                Json(input): Json<<T as UpdateQuery>::Patch>,
+                Json(input): Json<<T as UpdateQuery>::Update>,
             ) -> Result<Json<T>, StatusCode>
             where
                 T: UpdateQuery + Routable + Serialize + 'static,
                 S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as UpdateQuery>::Pk: DeserializeOwned + Send,
-                <T as UpdateQuery>::Patch: DeserializeOwned + Send,
+                <T as UpdateQuery>::Update: DeserializeOwned + Send,
                 <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 let (ctx, pool) = state.to_db_state();
@@ -196,20 +202,20 @@ mod macros {
                 Ok(Json(result))
             }
 
-            async fn put_router_impl<T, S>(
+            async fn replace_endpoint_impl<T, S>(
                 Path(id): Path<<T as UpdateQuery>::Pk>,
                 State(state): State<S>,
-                Json(input): Json<<T as UpdateQuery>::Put>,
+                Json(input): Json<<T as UpdateQuery>::Replace>,
             ) -> Result<Json<T>, StatusCode>
             where
                 T: UpdateQuery + Routable + Serialize + 'static,
                 S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as UpdateQuery>::Pk: DeserializeOwned + Send,
-                <T as UpdateQuery>::Put: DeserializeOwned + Send,
+                <T as UpdateQuery>::Replace: DeserializeOwned + Send,
                 <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 let (ctx, pool) = state.to_db_state();
-                let patch_input: <T as UpdateQuery>::Patch = input.into();
+                let patch_input: <T as UpdateQuery>::Update = input.into();
                 let result = ctx
                     .update::<T, _>(&pool, id, patch_input)
                     .await
