@@ -1,6 +1,7 @@
-use lazybe::axum::sqlite::ToDbState;
+use lazybe::DbCtx;
 use lazybe::axum::GetRouter;
-use lazybe::{DbCtx, SqliteDbCtx};
+use lazybe::axum::sqlite::ToDbState;
+use lazybe::sqlite::SqliteDbCtx;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
@@ -37,7 +38,7 @@ struct AppState {
 }
 
 impl ToDbState for AppState {
-    fn to_db_state(&self) -> (lazybe::SqliteDbCtx, sqlx::Pool<sqlx::Sqlite>) {
+    fn to_db_state(&self) -> (lazybe::sqlite::SqliteDbCtx, sqlx::Pool<sqlx::Sqlite>) {
         (self.ctx.clone(), self.pool.clone())
     }
 }
@@ -47,18 +48,6 @@ async fn main() -> anyhow::Result<()> {
     let ctx: SqliteDbCtx = DbCtx::sqlite();
     let pool = SqlitePool::connect("sqlite::memory:").await?;
     run_migration(&pool).await?;
-
-    let _ = ctx
-        .create::<Todo, _>(
-            &pool,
-            CreateTodo {
-                title: "Do homework".to_string(),
-                description: None,
-                status: Status::Todo,
-            },
-        )
-        .await
-        .unwrap();
 
     let state = AppState { ctx, pool };
     let app = axum::Router::new().merge(Todo::get_router()).with_state(state);

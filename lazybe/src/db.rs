@@ -26,27 +26,33 @@ where
 }
 
 #[cfg(feature = "sqlite")]
-pub type SqliteDbCtx = DbCtx<sea_query::SqliteQueryBuilder, sqlx::Sqlite>;
+pub mod sqlite {
+    use std::marker::PhantomData;
 
-#[cfg(feature = "sqlite")]
-impl DbCtx<sea_query::SqliteQueryBuilder, sqlx::Sqlite> {
-    pub fn sqlite() -> Self {
-        DbCtx {
-            query_builder: PhantomData,
-            db: PhantomData,
+    pub type SqliteDbCtx = super::DbCtx<sea_query::SqliteQueryBuilder, sqlx::Sqlite>;
+
+    impl super::DbCtx<sea_query::SqliteQueryBuilder, sqlx::Sqlite> {
+        pub fn sqlite() -> Self {
+            super::DbCtx {
+                query_builder: PhantomData,
+                db: PhantomData,
+            }
         }
     }
 }
 
 #[cfg(feature = "postgres")]
-pub type PostgresDbCtx = DbCtx<sea_query::PostgresQueryBuilder, sqlx::Postgres>;
+pub mod postgres {
+    use std::marker::PhantomData;
 
-#[cfg(feature = "postgres")]
-impl DbCtx<sea_query::PostgresQueryBuilder, sqlx::Postgres> {
-    pub fn postgres() -> Self {
-        DbCtx {
-            query_builder: PhantomData,
-            db: PhantomData,
+    pub type PostgresDbCtx = super::DbCtx<sea_query::PostgresQueryBuilder, sqlx::Postgres>;
+
+    impl super::DbCtx<sea_query::PostgresQueryBuilder, sqlx::Postgres> {
+        pub fn postgres() -> Self {
+            super::DbCtx {
+                query_builder: PhantomData,
+                db: PhantomData,
+            }
         }
     }
 }

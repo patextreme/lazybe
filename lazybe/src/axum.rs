@@ -21,7 +21,7 @@ pub mod sqlite {
     use super::{Routable, GetRouter};
     use crate::GetQuery;
 
-    type DbCtx = crate::db::SqliteDbCtx;
+    type DbCtx = crate::db::sqlite::SqliteDbCtx;
     type DbPool = sqlx::Pool<sqlx::Sqlite>;
     type DbRow = sqlx::sqlite::SqliteRow;
 
