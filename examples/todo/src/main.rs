@@ -1,5 +1,7 @@
-use lazybe::axum::GetRoutable;
+use std::str::FromStr;
+
 use lazybe::axum::sqlite::ToSqliteAxumState;
+use lazybe::axum::{GetRoutable, GetRouter};
 use lazybe::{DbCtx, SqliteDbCtx};
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
@@ -64,15 +66,41 @@ impl GetRoutable for Todo {
     }
 }
 
+impl GetRoutable for Staff {
+    fn get_route() -> &'static str {
+        "/staffs/{id}"
+    }
+}
+
+impl FromStr for StaffId {
+    type Err = std::convert::Infallible;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let i = u64::from_str(s).unwrap();
+        Ok(StaffId(i))
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let ctx: SqliteDbCtx = DbCtx::sqlite();
-    let pool = SqlitePool::connect("sqlite::memory:").await?;
+    // let pool = SqlitePool::connect("sqlite::memory:").await?;
+    let pool = SqlitePool::connect("sqlite://test.db").await?;
     run_migration(&pool).await?;
 
-    let state = AppState { ctx, pool };
+    let a = ctx
+        .create::<Staff, _>(
+            &pool,
+            CreateStaff {
+                name: "Alice".to_string(),
+            },
+        )
+        .await
+        .unwrap();
 
-    let app = axum::Router::new().with_state(state);
+    let state = AppState { ctx, pool };
+    let app = axum::Router::new()
+        .merge(Staff::get_router())
+        .with_state(state);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await?;
     Ok(())
