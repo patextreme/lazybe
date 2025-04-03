@@ -6,13 +6,14 @@ authors.workspace = true
 
 [dependencies]
 axum = { workspace = true }
-lazybe = { workspace = true, features = ["axum", "sqlite"] }
+lazybe = { workspace = true, features = ["axum", "sqlite", "postgres"] }
 sea-query = { workspace = true, features = ["with-chrono"] }
 serde = { workspace = true }
 sqlx = { workspace = true, features = [
   "runtime-tokio",
   "chrono",
   "sqlite",
+  "postgres",
 ] }
 
 anyhow = { version = "1" }

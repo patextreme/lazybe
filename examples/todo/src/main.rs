@@ -1,6 +1,4 @@
-use lazybe::DbCtx;
-use lazybe::axum::GetRouter;
-use lazybe::axum::sqlite::ToDbState;
+use lazybe::axum::{GetRouter, ToDbState};
 use lazybe::sqlite::SqliteDbCtx;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
@@ -38,14 +36,17 @@ struct AppState {
 }
 
 impl ToDbState for AppState {
-    fn to_db_state(&self) -> (lazybe::sqlite::SqliteDbCtx, sqlx::Pool<sqlx::Sqlite>) {
+    type Ctx = SqliteDbCtx;
+    type Db = Sqlite;
+
+    fn to_db_state(&self) -> (Self::Ctx, Pool<Self::Db>) {
         (self.ctx.clone(), self.pool.clone())
     }
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let ctx: SqliteDbCtx = DbCtx::sqlite();
+    let ctx = SqliteDbCtx;
     let pool = SqlitePool::connect("sqlite::memory:").await?;
     run_migration(&pool).await?;
 
