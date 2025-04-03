@@ -1,26 +1,9 @@
-use std::str::FromStr;
-
 use lazybe::axum::sqlite::ToSqliteAxumState;
 use lazybe::axum::{GetRoutable, GetRouter};
 use lazybe::{DbCtx, SqliteDbCtx};
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalNewtype)]
-pub struct StaffId(u64);
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalEntity)]
-#[lazybe(table = "staff")]
-pub struct Staff {
-    #[lazybe(primary_key)]
-    pub id: StaffId,
-    pub name: String,
-    #[lazybe(created_at)]
-    pub created_at: DateTime<Utc>,
-    #[lazybe(updated_at)]
-    pub updated_at: DateTime<Utc>,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::DalNewtype)]
 pub struct TodoId(u64);
@@ -33,7 +16,6 @@ pub struct Todo {
     pub title: String,
     pub description: Option<String>,
     pub status: Status,
-    pub assignee: Option<StaffId>,
     #[lazybe(created_at)]
     pub created_at: DateTime<Utc>,
     #[lazybe(updated_at)]
@@ -66,41 +48,26 @@ impl GetRoutable for Todo {
     }
 }
 
-impl GetRoutable for Staff {
-    fn get_route() -> &'static str {
-        "/staffs/{id}"
-    }
-}
-
-impl FromStr for StaffId {
-    type Err = std::convert::Infallible;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let i = u64::from_str(s).unwrap();
-        Ok(StaffId(i))
-    }
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let ctx: SqliteDbCtx = DbCtx::sqlite();
-    // let pool = SqlitePool::connect("sqlite::memory:").await?;
-    let pool = SqlitePool::connect("sqlite://test.db").await?;
+    let pool = SqlitePool::connect("sqlite::memory:").await?;
     run_migration(&pool).await?;
 
-    let a = ctx
-        .create::<Staff, _>(
+    let _ = ctx
+        .create::<Todo, _>(
             &pool,
-            CreateStaff {
-                name: "Alice".to_string(),
+            CreateTodo {
+                title: "Do homework".to_string(),
+                description: None,
+                status: Status::Todo,
             },
         )
         .await
         .unwrap();
 
     let state = AppState { ctx, pool };
-    let app = axum::Router::new()
-        .merge(Staff::get_router())
-        .with_state(state);
+    let app = axum::Router::new().merge(Todo::get_router()).with_state(state);
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, app).await?;
     Ok(())

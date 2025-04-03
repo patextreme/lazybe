@@ -10,8 +10,6 @@ pub trait GetRouter<S>: Sized {
 
 #[cfg(feature = "sqlite")]
 pub mod sqlite {
-    use std::str::FromStr;
-
     use axum::extract::{Path, State};
     use axum::http::StatusCode;
     use axum::routing::get;
@@ -31,7 +29,7 @@ pub mod sqlite {
     where
         T: GetQuery + GetRoutable + Serialize + DeserializeOwned + 'static,
         S: ToSqliteAxumState + Clone + Send + Sync + 'static,
-        <T as GetQuery>::Pk: FromStr + Send,
+        <T as GetQuery>::Pk: DeserializeOwned + Send,
         <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, sqlx::sqlite::SqliteRow> + Send + Unpin,
     {
         fn get_router() -> Router<S> {
@@ -40,17 +38,16 @@ pub mod sqlite {
         }
     }
 
-    async fn get_router_impl<T, S>(Path(id): Path<String>, State(state): State<S>) -> Result<Json<T>, StatusCode>
+    async fn get_router_impl<T, S>(Path(id): Path<<T as GetQuery>::Pk>, State(state): State<S>) -> Result<Json<T>, StatusCode>
     where
         T: GetQuery + GetRoutable + Serialize + DeserializeOwned + 'static,
         S: ToSqliteAxumState + Clone + Send + Sync + 'static,
-        <T as GetQuery>::Pk: FromStr + Send,
+        <T as GetQuery>::Pk: DeserializeOwned + Send,
         <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, sqlx::sqlite::SqliteRow> + Send + Unpin,
     {
-        let parsed_id: <T as GetQuery>::Pk = id.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
         let (ctx, pool) = state.to_sqlite_state();
         let result = ctx
-            .get::<T, _>(&pool, parsed_id)
+            .get::<T, _>(&pool, id)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .ok_or(StatusCode::NOT_FOUND)?;
