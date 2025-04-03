@@ -9,7 +9,7 @@ use syn::{Data, DataStruct, DeriveInput, Field, Fields, FieldsNamed, Ident, Visi
 struct EntityAttr {
     table: String,
     #[darling(default)]
-    url_slug: Option<String>,
+    endpoint: Option<String>,
 }
 
 #[derive(Clone, FromField)]
@@ -334,7 +334,7 @@ fn entity_row_impl(entity_meta: &EntityMeta) -> TokenStream {
 
 fn entity_route_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let entity = &entity_meta.entity_ident;
-    let Some(base_url) = entity_meta.entity_attr.url_slug.as_ref() else {
+    let Some(base_url) = entity_meta.entity_attr.endpoint.as_ref() else {
         return TokenStream::new();
     };
     let get_route = format!("/{}/{{id}}", base_url);

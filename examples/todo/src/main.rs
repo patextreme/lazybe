@@ -1,5 +1,5 @@
+use lazybe::axum::sqlite::ToDbState;
 use lazybe::axum::GetRouter;
-use lazybe::axum::sqlite::ToSqliteAxumState;
 use lazybe::{DbCtx, SqliteDbCtx};
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
@@ -9,7 +9,7 @@ use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 pub struct TodoId(u64);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Entity)]
-#[lazybe(table = "todo", url_slug = "todos")]
+#[lazybe(table = "todo", endpoint = "todos")]
 pub struct Todo {
     #[lazybe(primary_key)]
     pub id: TodoId,
@@ -36,8 +36,8 @@ struct AppState {
     pool: SqlitePool,
 }
 
-impl ToSqliteAxumState for AppState {
-    fn to_sqlite_state(&self) -> (lazybe::SqliteDbCtx, sqlx::Pool<sqlx::Sqlite>) {
+impl ToDbState for AppState {
+    fn to_db_state(&self) -> (lazybe::SqliteDbCtx, sqlx::Pool<sqlx::Sqlite>) {
         (self.ctx.clone(), self.pool.clone())
     }
 }
