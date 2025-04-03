@@ -1,6 +1,6 @@
-use lazybe::router::{GetRoutable, RouterState};
+use lazybe::axum::GetRoutable;
+use lazybe::axum::sqlite::ToSqliteAxumState;
 use lazybe::{DbCtx, SqliteDbCtx};
-use sea_query::SqliteQueryBuilder;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
@@ -52,16 +52,9 @@ struct AppState {
     pool: SqlitePool,
 }
 
-impl RouterState for AppState {
-    type Qb = SqliteQueryBuilder;
-    type Db = Sqlite;
-
-    fn db_pool(&self) -> Pool<Self::Db> {
-        self.pool.clone()
-    }
-
-    fn db_ctx(&self) -> DbCtx<Self::Qb, Self::Db> {
-        self.ctx.clone()
+impl ToSqliteAxumState for AppState {
+    fn to_sqlite_state(&self) -> (lazybe::SqliteDbCtx, sqlx::Pool<sqlx::Sqlite>) {
+        (self.ctx.clone(), self.pool.clone())
     }
 }
 
