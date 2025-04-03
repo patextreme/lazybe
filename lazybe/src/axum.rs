@@ -1,6 +1,6 @@
 use axum::Router;
 
-pub trait GetRoutable {
+pub trait Routable {
     fn get_route() -> &'static str;
 }
 
@@ -18,7 +18,7 @@ pub mod sqlite {
     use serde::de::DeserializeOwned;
     use sqlx::FromRow;
 
-    use super::{GetRoutable, GetRouter};
+    use super::{Routable, GetRouter};
     use crate::GetQuery;
 
     type DbCtx = crate::db::SqliteDbCtx;
@@ -31,13 +31,13 @@ pub mod sqlite {
 
     impl<T, S> GetRouter<S> for T
     where
-        T: GetQuery + GetRoutable + Serialize + DeserializeOwned + 'static,
+        T: GetQuery + Routable + Serialize + DeserializeOwned + 'static,
         S: ToDbState + Clone + Send + Sync + 'static,
         <T as GetQuery>::Pk: DeserializeOwned + Send,
         <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, DbRow> + Send + Unpin,
     {
         fn get_router() -> Router<S> {
-            let route = <T as GetRoutable>::get_route();
+            let route = <T as Routable>::get_route();
             Router::new().route(route, get(get_router_impl::<T, S>))
         }
     }
@@ -47,7 +47,7 @@ pub mod sqlite {
         State(state): State<S>,
     ) -> Result<Json<T>, StatusCode>
     where
-        T: GetQuery + GetRoutable + Serialize + DeserializeOwned + 'static,
+        T: GetQuery + Routable + Serialize + DeserializeOwned + 'static,
         S: ToDbState + Clone + Send + Sync + 'static,
         <T as GetQuery>::Pk: DeserializeOwned + Send,
         <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, DbRow> + Send + Unpin,
@@ -85,13 +85,13 @@ pub mod postgres {
 
     impl<T, S> GetRouter<S> for T
     where
-        T: GetQuery + GetRoutable + Serialize + DeserializeOwned + 'static,
+        T: GetQuery + Routable + Serialize + DeserializeOwned + 'static,
         S: ToDbState + Clone + Send + Sync + 'static,
         <T as GetQuery>::Pk: DeserializeOwned + Send,
         <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, DbRow> + Send + Unpin,
     {
         fn get_router() -> Router<S> {
-            let route = <T as GetRoutable>::get_route();
+            let route = <T as Routable>::get_route();
             Router::new().route(route, get(get_router_impl::<T, S>))
         }
     }
@@ -101,7 +101,7 @@ pub mod postgres {
         State(state): State<S>,
     ) -> Result<Json<T>, StatusCode>
     where
-        T: GetQuery + GetRoutable + Serialize + DeserializeOwned + 'static,
+        T: GetQuery + Routable + Serialize + DeserializeOwned + 'static,
         S: ToDbState + Clone + Send + Sync + 'static,
         <T as GetQuery>::Pk: DeserializeOwned + Send,
         <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, DbRow> + Send + Unpin,

@@ -339,7 +339,7 @@ fn entity_route_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     };
     let get_route = format!("/{}/{{id}}", base_url);
     quote! {
-        impl lazybe::axum::GetRoutable for #entity {
+        impl lazybe::axum::Routable for #entity {
             fn get_route() -> &'static str {
                 #get_route
             }
