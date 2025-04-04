@@ -1,4 +1,4 @@
-use lazybe::axum::{CreateRouter, DeleteRouter, GetRouter, RouteConfig, UpdateRouter};
+use lazybe::axum::{CreateRouter, DeleteRouter, GetRouter, ListRouter, RouteConfig, UpdateRouter};
 use lazybe::sqlite::SqliteDbCtx;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
@@ -47,12 +47,14 @@ impl RouteConfig for AppState {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let ctx = SqliteDbCtx;
-    let pool = SqlitePool::connect("sqlite::memory:").await?;
+    // let pool = SqlitePool::connect("sqlite::memory:").await?;
+    let pool = SqlitePool::connect("sqlite://test.db").await?;
     run_migration(&pool).await?;
 
     let state = AppState { ctx, pool };
     let app = axum::Router::new()
         .merge(Todo::get_endpoint())
+        .merge(Todo::list_endpoint())
         .merge(Todo::create_endpoint())
         .merge(Todo::replace_endpoint())
         .merge(Todo::update_endpoint())

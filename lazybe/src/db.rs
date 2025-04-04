@@ -192,7 +192,7 @@ where
             base_query = base_query.order_by_columns(order_by).to_owned();
 
             // filter
-            if let Some(p) = pagination {
+            if let Some(p) = &pagination {
                 base_query = base_query.limit(p.limit).offset(p.offset()).to_owned();
             }
             base_query.to_string(self.query_buidler())
@@ -202,9 +202,19 @@ where
             let data_result: Vec<<T as ListQuery>::Row> =
                 sqlx::query_as(&data_query).fetch_all(executor.clone()).await?;
             let count_result: CountResult = sqlx::query_as(&count_query).fetch_one(executor).await?;
+
+            let mut page = 0;
+            let mut page_size = count_result.count;
+            if let Some(p) = pagination {
+                page = p.page;
+                page_size = p.limit;
+            }
+
             let result = Page {
+                page,
+                page_size,
+                total_records: count_result.count,
                 data: data_result.into_iter().map(|i| i.into()).collect(),
-                total: count_result.count,
             };
             Ok(result)
         }

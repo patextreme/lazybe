@@ -1,4 +1,6 @@
-#[derive(Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pagination {
     /// 0-index page number (0 is the first page)
     pub page: u64,
@@ -17,8 +19,10 @@ impl Pagination {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Page<T> {
-    pub total: u64,
+    pub page: u64,
+    pub page_size: u64,
+    pub total_records: u64,
     pub data: Vec<T>,
 }

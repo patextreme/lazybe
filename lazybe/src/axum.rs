@@ -46,10 +46,38 @@ pub mod sqlite {
     use serde::de::DeserializeOwned;
     use sqlx::{Database, FromRow};
 
-    use super::{CreateRouter, DeleteRouter, GetRouter, Routable, RouteConfig, UpdateRouter};
-    use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery, UpdateQuery};
+    use super::{CreateRouter, DeleteRouter, GetRouter, ListRouter, Routable, RouteConfig, UpdateRouter};
+    use crate::filter::Filter;
+    use crate::sort::Sort;
+    use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery, ListQuery, Page, UpdateQuery};
 
     super::macros::axum_route_impl!(sqlx::Sqlite, crate::db::sqlite::SqliteDbCtx);
+
+    impl<T, S> ListRouter<S, DbImpl> for T
+    where
+        T: ListQuery + Routable + Serialize + 'static,
+        S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+        <T as ListQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
+    {
+        fn list_endpoint() -> Router<S> {
+            let route = <T as Routable>::entity_collection_path();
+            Router::new().route(route, get(list_endpoint_impl::<T, S>))
+        }
+    }
+
+    async fn list_endpoint_impl<T, S>(State(state): State<S>) -> Result<Json<Page<T>>, StatusCode>
+    where
+        T: ListQuery + Routable + Serialize + 'static,
+        S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+        <T as ListQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
+    {
+        let (ctx, pool) = state.db_ctx();
+        let result = ctx
+            .list_page::<T, _>(&pool, Filter::empty(), Sort::empty(), None)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        Ok(Json(result))
+    }
 }
 
 #[cfg(feature = "postgres")]
