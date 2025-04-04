@@ -4,7 +4,7 @@ use sqlx::{Database, Executor, FromRow, IntoArguments};
 
 use crate::filter::Filter;
 use crate::sort::Sort;
-use crate::{CreateQuery, DeleteQuery, GetQuery, ListQuery, Page, Pagination, UpdateQuery};
+use crate::{CreateQuery, DeleteQuery, GetQuery, ListQuery, Page, PaginationInput, UpdateQuery};
 
 pub trait DbCtx<Db> {
     type Qb: QueryBuilder + Default + Send;
@@ -80,7 +80,7 @@ where
         executor: E,
         filter: Filter<T>,
         sort: Sort<T>,
-        pagination: Option<Pagination>,
+        pagination: Option<PaginationInput>,
     ) -> impl Future<Output = Result<Page<T>, sqlx::Error>> + Send
     where
         E: Executor<'e, Database = Db> + Clone,
@@ -166,7 +166,7 @@ where
         executor: E,
         filter: Filter<T>,
         sort: Sort<T>,
-        pagination: Option<Pagination>,
+        pagination: Option<PaginationInput>,
     ) -> impl Future<Output = Result<Page<T>, sqlx::Error>> + Send
     where
         E: Executor<'e, Database = Db> + Clone,
@@ -193,7 +193,7 @@ where
 
             // filter
             if let Some(p) = &pagination {
-                base_query = base_query.limit(p.limit).offset(p.offset()).to_owned();
+                base_query = base_query.limit(p.limit.into()).offset(p.offset().into()).to_owned();
             }
             base_query.to_string(self.query_buidler())
         };
@@ -203,17 +203,17 @@ where
                 sqlx::query_as(&data_query).fetch_all(executor.clone()).await?;
             let count_result: CountResult = sqlx::query_as(&count_query).fetch_one(executor).await?;
 
-            let mut page = 0;
-            let mut page_size = count_result.count;
+            let mut page: u32 = 0;
+            let mut page_size: u64 = count_result.count.unsigned_abs();
             if let Some(p) = pagination {
                 page = p.page;
-                page_size = p.limit;
+                page_size = p.limit.into();
             }
 
             let result = Page {
                 page,
                 page_size,
-                total_records: count_result.count,
+                total_records: count_result.count.unsigned_abs(),
                 data: data_result.into_iter().map(|i| i.into()).collect(),
             };
             Ok(result)
@@ -275,6 +275,6 @@ where
 mod projection {
     #[derive(sqlx::FromRow)]
     pub struct CountResult {
-        pub count: u64,
+        pub count: i64,
     }
 }

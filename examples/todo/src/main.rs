@@ -47,8 +47,7 @@ impl RouteConfig for AppState {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let ctx = SqliteDbCtx;
-    // let pool = SqlitePool::connect("sqlite::memory:").await?;
-    let pool = SqlitePool::connect("sqlite://test.db").await?;
+    let pool = SqlitePool::connect("sqlite::memory:").await?;
     run_migration(&pool).await?;
 
     let state = AppState { ctx, pool };
