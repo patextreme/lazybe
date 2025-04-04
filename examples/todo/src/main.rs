@@ -1,4 +1,4 @@
-use lazybe::axum::{CreateRouter, DeleteRouter, GetRouter, ToDbState, UpdateRouter};
+use lazybe::axum::{CreateRouter, DeleteRouter, GetRouter, RouteConfig, UpdateRouter};
 use lazybe::sqlite::SqliteDbCtx;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
@@ -35,11 +35,11 @@ struct AppState {
     pool: SqlitePool,
 }
 
-impl ToDbState for AppState {
+impl RouteConfig for AppState {
     type Ctx = SqliteDbCtx;
     type Db = Sqlite;
 
-    fn to_db_state(&self) -> (Self::Ctx, Pool<Self::Db>) {
+    fn db_ctx(&self) -> (Self::Ctx, Pool<Self::Db>) {
         (self.ctx.clone(), self.pool.clone())
     }
 }

@@ -12,6 +12,10 @@ pub trait GetRouter<S, Db> {
     fn get_endpoint() -> Router<S>;
 }
 
+pub trait ListRouter<S, Db> {
+    fn list_endpoint() -> Router<S>;
+}
+
 pub trait CreateRouter<S, Db> {
     fn create_endpoint() -> Router<S>;
 }
@@ -25,11 +29,11 @@ pub trait DeleteRouter<S, Db> {
     fn delete_endpoint() -> Router<S>;
 }
 
-pub trait ToDbState {
+pub trait RouteConfig {
     type Ctx: DbOps<Self::Db>;
     type Db: Database;
 
-    fn to_db_state(&self) -> (Self::Ctx, Pool<Self::Db>);
+    fn db_ctx(&self) -> (Self::Ctx, Pool<Self::Db>);
 }
 
 #[cfg(feature = "sqlite")]
@@ -42,7 +46,7 @@ pub mod sqlite {
     use serde::de::DeserializeOwned;
     use sqlx::{Database, FromRow};
 
-    use super::{CreateRouter, DeleteRouter, GetRouter, Routable, ToDbState, UpdateRouter};
+    use super::{CreateRouter, DeleteRouter, GetRouter, Routable, RouteConfig, UpdateRouter};
     use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery, UpdateQuery};
 
     super::macros::axum_route_impl!(sqlx::Sqlite, crate::db::sqlite::SqliteDbCtx);
@@ -58,7 +62,7 @@ pub mod postgres {
     use serde::de::DeserializeOwned;
     use sqlx::{Database, FromRow};
 
-    use super::{CreateRouter, DeleteRouter, GetRouter, Routable, ToDbState, UpdateRouter};
+    use super::{CreateRouter, DeleteRouter, GetRouter, Routable, RouteConfig, UpdateRouter};
     use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery, UpdateQuery};
 
     super::macros::axum_route_impl!(sqlx::Postgres, crate::db::postgres::PostgresDbCtx);
@@ -73,7 +77,7 @@ mod macros {
             impl<T, S> GetRouter<S, DbImpl> for T
             where
                 T: GetQuery + Routable + Serialize + 'static,
-                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as GetQuery>::Pk: DeserializeOwned + Send,
                 <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
@@ -89,11 +93,11 @@ mod macros {
             ) -> Result<Json<T>, StatusCode>
             where
                 T: GetQuery + Routable + Serialize + 'static,
-                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as GetQuery>::Pk: DeserializeOwned + Send,
                 <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
-                let (ctx, pool) = state.to_db_state();
+                let (ctx, pool) = state.db_ctx();
                 let result = ctx
                     .get::<T, _>(&pool, id)
                     .await
@@ -105,7 +109,7 @@ mod macros {
             impl<T, S> CreateRouter<S, DbImpl> for T
             where
                 T: CreateQuery + Routable + Serialize + DeserializeOwned + 'static,
-                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as CreateQuery>::Create: DeserializeOwned + Send,
                 <T as CreateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
@@ -121,11 +125,11 @@ mod macros {
             ) -> Result<Json<T>, StatusCode>
             where
                 T: CreateQuery + Routable + Serialize + DeserializeOwned + 'static,
-                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as CreateQuery>::Create: DeserializeOwned + Send,
                 <T as CreateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
-                let (ctx, pool) = state.to_db_state();
+                let (ctx, pool) = state.db_ctx();
                 let result = ctx
                     .create::<T, _>(&pool, input)
                     .await
@@ -136,7 +140,7 @@ mod macros {
             impl<T, S> DeleteRouter<S, DbImpl> for T
             where
                 T: DeleteQuery + Routable + Serialize + 'static,
-                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as DeleteQuery>::Pk: DeserializeOwned + Send,
             {
                 fn delete_endpoint() -> Router<S> {
@@ -151,10 +155,10 @@ mod macros {
             ) -> Result<Json<()>, StatusCode>
             where
                 T: DeleteQuery + Routable + Serialize + 'static,
-                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as DeleteQuery>::Pk: DeserializeOwned + Send,
             {
-                let (ctx, pool) = state.to_db_state();
+                let (ctx, pool) = state.db_ctx();
                 ctx.delete::<T, _>(&pool, id)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -164,7 +168,7 @@ mod macros {
             impl<T, S> UpdateRouter<S, DbImpl> for T
             where
                 T: UpdateQuery + Routable + Serialize + 'static,
-                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as UpdateQuery>::Pk: DeserializeOwned + Send,
                 <T as UpdateQuery>::Update: DeserializeOwned + Send,
                 <T as UpdateQuery>::Replace: DeserializeOwned + Send,
@@ -188,12 +192,12 @@ mod macros {
             ) -> Result<Json<T>, StatusCode>
             where
                 T: UpdateQuery + Routable + Serialize + 'static,
-                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as UpdateQuery>::Pk: DeserializeOwned + Send,
                 <T as UpdateQuery>::Update: DeserializeOwned + Send,
                 <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
-                let (ctx, pool) = state.to_db_state();
+                let (ctx, pool) = state.db_ctx();
                 let result = ctx
                     .update::<T, _>(&pool, id, input)
                     .await
@@ -209,12 +213,12 @@ mod macros {
             ) -> Result<Json<T>, StatusCode>
             where
                 T: UpdateQuery + Routable + Serialize + 'static,
-                S: ToDbState<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as UpdateQuery>::Pk: DeserializeOwned + Send,
                 <T as UpdateQuery>::Replace: DeserializeOwned + Send,
                 <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
-                let (ctx, pool) = state.to_db_state();
+                let (ctx, pool) = state.db_ctx();
                 let patch_input: <T as UpdateQuery>::Update = input.into();
                 let result = ctx
                     .update::<T, _>(&pool, id, patch_input)
