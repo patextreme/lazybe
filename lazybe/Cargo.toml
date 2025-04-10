@@ -5,11 +5,14 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
+axum = { workspace = true }
 lazybe-macro = { path = "../lazybe-macro" }
 sea-query = { workspace = true }
+serde = { workspace = true }
 sqlx = { workspace = true }
 
 [features]
 default = []
 sqlite = []
 postgres = []
+axum = []

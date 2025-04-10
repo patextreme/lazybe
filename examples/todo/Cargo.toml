@@ -5,9 +5,17 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-lazybe = { workspace = true, features = ["sqlite"] }
+axum = { workspace = true }
+lazybe = { workspace = true, features = ["axum", "sqlite", "postgres"] }
 sea-query = { workspace = true, features = ["with-chrono"] }
-sqlx = { workspace = true, features = ["runtime-tokio", "sqlite", "chrono"] }
+serde = { workspace = true }
+sqlx = { workspace = true, features = [
+  "runtime-tokio",
+  "chrono",
+  "sqlite",
+  "postgres",
+] }
 
-anyhow = "1"
+anyhow = { version = "1" }
+chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1", features = ["full"] }

@@ -20,6 +20,7 @@ pub trait CreateQuery {
 pub trait UpdateQuery {
     type Pk;
     type Update;
+    type Replace: Into<Self::Update>;
     type Row;
     fn update_query(id: Self::Pk, input: Self::Update) -> sea_query::UpdateStatement;
 }

@@ -8,7 +8,9 @@ edition = "2024"
 authors = ["Pat Losoponkul <pat.losoponkul@gmail.com>"]
 
 [workspace.dependencies]
+axum = "0.8"
 sea-query = "0.32"
+serde = "1"
 sqlx = "0.8"
 
 lazybe = { path = "./lazybe" }

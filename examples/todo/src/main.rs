@@ -1,119 +1,69 @@
-use lazybe::filter::Filter;
-use lazybe::sort::Sort;
-use lazybe::{DbCtx, SqliteDbCtx};
-use sqlx::types::chrono::{DateTime, Utc};
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::routing::get;
+use entity::staff::Staff;
+use entity::todo::Todo;
+use lazybe::axum::{CreateRouter, DeleteRouter, GetRouter, ListRouter, RouteConfig, UpdateRouter};
+use lazybe::sqlite::SqliteDbCtx;
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalNewtype)]
-pub struct StaffId(u64);
+mod entity;
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalEntity)]
-#[lazybe(table = "staff")]
-pub struct Staff {
-    #[lazybe(primary_key)]
-    pub id: StaffId,
-    pub name: String,
-    #[lazybe(created_at)]
-    pub created_at: DateTime<Utc>,
-    #[lazybe(updated_at)]
-    pub updated_at: DateTime<Utc>,
+#[derive(Clone)]
+struct AppState {
+    ctx: SqliteDbCtx,
+    pool: SqlitePool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalNewtype)]
-pub struct TodoId(u64);
+impl RouteConfig for AppState {
+    type Ctx = SqliteDbCtx;
+    type Db = Sqlite;
 
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalEntity)]
-#[lazybe(table = "todo")]
-pub struct Todo {
-    #[lazybe(primary_key)]
-    pub id: TodoId,
-    pub title: String,
-    pub description: Option<String>,
-    pub status: Status,
-    pub assignee: Option<StaffId>,
-    #[lazybe(created_at)]
-    pub created_at: DateTime<Utc>,
-    #[lazybe(updated_at)]
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, lazybe::DalEnum)]
-pub enum Status {
-    Backlog,
-    Todo,
-    Doing,
-    Done,
+    fn db_ctx(&self) -> (Self::Ctx, Pool<Self::Db>) {
+        (self.ctx.clone(), self.pool.clone())
+    }
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let ctx = SqliteDbCtx;
     let pool = SqlitePool::connect("sqlite::memory:").await?;
-    let ctx: SqliteDbCtx = DbCtx::sqlite();
-    run_migration(&pool).await?;
+    reset_db(&pool).await?;
 
-    let alice: Staff = ctx
-        .create(
-            &pool,
-            CreateStaff {
-                name: "Alice".to_string(),
-            },
-        )
-        .await?;
-
-    let todo_defs = [("Do homework", Status::Doing), ("Wash car", Status::Todo)];
-    for (title, status) in todo_defs {
-        ctx.create::<Todo, _>(
-            &pool,
-            CreateTodo {
-                title: title.to_string(),
-                description: None,
-                status,
-                assignee: Some(alice.id.clone()),
-            },
-        )
-        .await?;
-    }
-
-    let tasks = ctx.list_all::<Todo, _>(&pool, Filter::empty(), Sort::empty()).await?;
-    println!(">>>>> All tasks <<<<<\n{:#?}", tasks);
-
-    // Alice pick up a task and complete it
-    let alice_incomplete_tasks = ctx
-        .list_all::<Todo, _>(
-            &pool,
-            Filter::all([
-                TodoFilter::assignee().eq(Some(alice.id.clone())),
-                TodoFilter::status().neq(Status::Done),
-            ]),
-            Sort::empty(),
-        )
-        .await?;
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-    ctx.update::<Todo, _>(
-        &pool,
-        alice_incomplete_tasks.first().cloned().unwrap().id,
-        UpdateTodo {
-            status: Some(Status::Done),
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    let completed_tasks = ctx
-        .list_all(
-            &pool,
-            Filter::all([TodoFilter::status().eq(Status::Done)]),
-            Sort::empty(),
-        )
-        .await?;
-    println!(">>>>> Completed tasks <<<<<\n{:#?}", completed_tasks);
-
+    let state = AppState { ctx, pool };
+    let app = axum::Router::new()
+        .route("/_system/reset", get(reset_handler))
+        .merge(Todo::get_endpoint())
+        .merge(Todo::list_endpoint())
+        .merge(Todo::create_endpoint())
+        .merge(Todo::replace_endpoint())
+        .merge(Todo::update_endpoint())
+        .merge(Todo::delete_endpoint())
+        .merge(Staff::get_endpoint())
+        .merge(Staff::list_endpoint())
+        .merge(Staff::create_endpoint())
+        .merge(Staff::replace_endpoint())
+        .merge(Staff::update_endpoint())
+        .merge(Staff::delete_endpoint())
+        .with_state(state);
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    axum::serve(listener, app).await?;
     Ok(())
 }
 
-async fn run_migration(pool: &Pool<Sqlite>) -> anyhow::Result<()> {
+async fn reset_handler(State(state): State<AppState>) -> Result<(), StatusCode> {
+    reset_db(&state.pool)
+        .await
+        .inspect_err(|e| println!("Could not reset the system: {}", e))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
+
+async fn reset_db(pool: &Pool<Sqlite>) -> anyhow::Result<()> {
     pool.execute(
         r#"
+DROP TABLE IF EXISTS todo;
+DROP TABLE IF EXISTS staff;
+
 CREATE TABLE IF NOT EXISTS staff (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -126,9 +76,10 @@ CREATE TABLE IF NOT EXISTS todo (
     title TEXT NOT NULL,
     description TEXT,
     status TEXT NOT NULL,
-    assignee INTEGER REFERENCES staff(id) ON DELETE RESTRICT,
+    assignee INTEGER NOT NULL,
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    updated_at DATETIME NOT NULL,
+    FOREIGN KEY (assignee) REFERENCES staff(id) ON DELETE RESTRICT
 );
         "#,
     )

@@ -68,6 +68,8 @@
               (with pkgs; [
                 # base
                 git
+                hurl
+                jq
                 less
                 ncurses
                 pkg-config

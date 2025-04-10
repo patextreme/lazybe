@@ -1,13 +1,22 @@
 use convert_case::{Case, Casing};
-use darling::{FromDeriveInput, FromField};
+use darling::{FromDeriveInput, FromField, FromMeta};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{Data, DataStruct, DeriveInput, Field, Fields, FieldsNamed, Ident, Visibility};
+
+#[derive(Clone, FromMeta)]
+enum CollectionApi {
+    Default,
+}
 
 #[derive(Clone, FromDeriveInput)]
 #[darling(attributes(lazybe))]
 struct EntityAttr {
     table: String,
+    #[darling(default)]
+    endpoint: Option<String>,
+    #[darling(default)]
+    collection_api: Option<CollectionApi>,
 }
 
 #[derive(Clone, FromField)]
@@ -27,6 +36,7 @@ struct EntityMeta {
     entity_attr: EntityAttr,
     create_entity: Ident,
     update_entity: Ident,
+    replace_entity: Ident,
     filter_entity: Ident,
     sort_entity: Ident,
     sqlx_row_ident: Ident,
@@ -108,6 +118,7 @@ impl EntityMeta {
             entity_attr: EntityAttr::from_derive_input(input)?,
             create_entity: format_ident!("Create{}", input.ident),
             update_entity: format_ident!("Update{}", input.ident),
+            replace_entity: format_ident!("Replace{}", input.ident),
             filter_entity: format_ident!("{}Filter", input.ident),
             sort_entity: format_ident!("{}Sort", input.ident),
             sqlx_row_ident: format_ident!("{}SqlxRow", input.ident),
@@ -191,10 +202,14 @@ fn expand_struct(input: &DeriveInput, data_struct: &DataStruct) -> syn::Result<T
             let entity_types_impl = entity_types_impl(&entity_meta);
             let entity_row_impl = entity_row_impl(&entity_meta);
             let entity_query_trait_impl = entity_query_trait_impl(&entity_meta);
+            let entity_route_trait_impl = entity_route_trait_impl(&entity_meta);
+            let entity_collection_api_trait_impl = entity_collection_api_trait_impl(&entity_meta);
             Ok(quote! {
                 #entity_types_impl
-                #entity_query_trait_impl
                 #entity_row_impl
+                #entity_query_trait_impl
+                #entity_route_trait_impl
+                #entity_collection_api_trait_impl
             })
         }
         Fields::Unnamed(_) => Err(syn::Error::new_spanned(
@@ -213,7 +228,8 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
     let entity_vis = &entity_meta.entity_vis;
     let entity_sea_query_ident = &entity_meta.sea_query_ident;
     let create_entity = &entity_meta.create_entity;
-    let update_entity = &entity_meta.update_entity;
+    let patch_entity = &entity_meta.update_entity;
+    let put_entity = &entity_meta.replace_entity;
     let filter_entity = &entity_meta.filter_entity;
     let sort_entity = &entity_meta.sort_entity;
     let user_defined_field_defs = entity_meta.user_defined_fields.iter().map(|f| {
@@ -222,11 +238,21 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
         let field_ty = &f.0.ty;
         quote! { #field_vis #field_ident: #field_ty }
     });
-    let update_entity_field_defs = entity_meta.user_defined_fields.iter().map(|f| {
+    let patch_entity_field_defs = entity_meta.user_defined_fields.iter().map(|f| {
         let field_vis = &f.0.vis;
         let field_ident = f.0.ident.as_ref().unwrap();
         let field_ty = &f.0.ty;
         quote! { #field_vis #field_ident: Option<#field_ty> }
+    });
+    let put_entity_field_defs = entity_meta.user_defined_fields.iter().map(|f| {
+        let field_vis = &f.0.vis;
+        let field_ident = f.0.ident.as_ref().unwrap();
+        let field_ty = &f.0.ty;
+        quote! { #field_vis #field_ident: #field_ty }
+    });
+    let put_entity_field_intos = entity_meta.user_defined_fields.iter().map(|f| {
+        let field_ident = f.0.ident.as_ref().unwrap();
+        quote! { #field_ident: Some(value.#field_ident) }
     });
     let filter_method_defs = entity_meta
         .all_fields
@@ -256,14 +282,27 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
             }
         });
     quote! {
-        #[derive(Clone)]
+        #[derive(Clone, serde::Serialize, serde::Deserialize)]
         #entity_vis struct #create_entity {
             #(#user_defined_field_defs),*
         }
 
-        #[derive(Default, Clone)]
-        #entity_vis struct #update_entity {
-            #(#update_entity_field_defs),*
+        #[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
+        #entity_vis struct #patch_entity {
+            #(#patch_entity_field_defs),*
+        }
+
+        #[derive(Clone, serde::Serialize, serde::Deserialize)]
+        #entity_vis struct #put_entity {
+            #(#put_entity_field_defs),*
+        }
+
+        impl From<#put_entity> for #patch_entity {
+            fn from(value: #put_entity) -> Self {
+                Self {
+                    #(#put_entity_field_intos),*
+                }
+            }
         }
 
         #[derive(Clone)]
@@ -325,6 +364,56 @@ fn entity_row_impl(entity_meta: &EntityMeta) -> TokenStream {
             Table,
             #(#all_field_idents),*
         }
+    }
+}
+
+fn entity_route_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
+    let entity = &entity_meta.entity_ident;
+    let Some(base_url) = entity_meta.entity_attr.endpoint.as_ref() else {
+        return TokenStream::new();
+    };
+    let get_path = format!("{}/{{id}}", base_url);
+    let list_path = base_url.to_string();
+    quote! {
+        impl lazybe::axum::Routable for #entity {
+            fn entity_path() -> &'static str {
+                #get_path
+            }
+            fn entity_collection_path() -> &'static str {
+                #list_path
+            }
+        }
+    }
+}
+
+fn entity_collection_api_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
+    let entity = &entity_meta.entity_ident;
+    let Some(ref collection_api) = entity_meta.entity_attr.collection_api else {
+        return TokenStream::new();
+    };
+    match collection_api {
+        CollectionApi::Default => quote! {
+            impl lazybe::axum::EntityCollectionApi for #entity {
+                type Resp = lazybe::Page<Self>;
+                type Query = ();
+
+                fn page_response(page: lazybe::Page<Self>) -> Self::Resp {
+                    page
+                }
+
+                fn page_input(_input: &Self::Query) -> Option<lazybe::PaginationInput> {
+                    None
+                }
+
+                fn filter_input(_input: &Self::Query) -> lazybe::filter::Filter<Self> {
+                    lazybe::filter::Filter::empty()
+                }
+
+                fn sort_input(_input: &Self::Query) -> lazybe::sort::Sort<Self> {
+                    lazybe::sort::Sort::empty()
+                }
+            }
+        },
     }
 }
 
@@ -398,6 +487,7 @@ fn create_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
 fn update_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let entity = &entity_meta.entity_ident;
     let update_entity = &entity_meta.update_entity;
+    let replace_entity = &entity_meta.replace_entity;
     let sqlx_row_ident = &entity_meta.sqlx_row_ident;
     let sea_query_ident = &entity_meta.sea_query_ident;
     let pk_ty = &entity_meta.primary_key.ty;
@@ -425,6 +515,7 @@ fn update_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
         impl lazybe::UpdateQuery for #entity {
             type Pk = #pk_ty;
             type Update = #update_entity;
+            type Replace = #replace_entity;
             type Row = #sqlx_row_ident;
             fn update_query(id: Self::Pk, input: Self::Update) -> sea_query::UpdateStatement {
                 #now_value
