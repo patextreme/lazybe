@@ -6,7 +6,7 @@ use syn::{Data, DataStruct, DeriveInput, Field, Fields, FieldsNamed, Ident, Visi
 
 #[derive(Clone, FromMeta)]
 enum CollectionApi {
-    Default,
+    List,
 }
 
 #[derive(Clone, FromDeriveInput)]
@@ -17,6 +17,8 @@ struct EntityAttr {
     endpoint: Option<String>,
     #[darling(default)]
     collection_api: Option<CollectionApi>,
+    #[darling(default)]
+    derive_to_schema: bool,
 }
 
 #[derive(Clone, FromField)]
@@ -281,18 +283,23 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
                 }
             }
         });
+    let derive_to_schema =
+        Some(quote! { #[derive(utoipa::ToSchema)] }).filter(|_| entity_meta.entity_attr.derive_to_schema);
     quote! {
         #[derive(Clone, serde::Serialize, serde::Deserialize)]
+        #derive_to_schema
         #entity_vis struct #create_entity {
             #(#user_defined_field_defs),*
         }
 
         #[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
+        #derive_to_schema
         #entity_vis struct #patch_entity {
             #(#patch_entity_field_defs),*
         }
 
         #[derive(Clone, serde::Serialize, serde::Deserialize)]
+        #derive_to_schema
         #entity_vis struct #put_entity {
             #(#put_entity_field_defs),*
         }
@@ -375,7 +382,7 @@ fn entity_route_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let get_path = format!("{}/{{id}}", base_url);
     let list_path = base_url.to_string();
     quote! {
-        impl lazybe::axum::Routable for #entity {
+        impl lazybe::router::Routable for #entity {
             fn entity_path() -> &'static str {
                 #get_path
             }
@@ -392,13 +399,13 @@ fn entity_collection_api_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
         return TokenStream::new();
     };
     match collection_api {
-        CollectionApi::Default => quote! {
-            impl lazybe::axum::EntityCollectionApi for #entity {
-                type Resp = lazybe::Page<Self>;
+        CollectionApi::List => quote! {
+            impl lazybe::router::EntityCollectionApi for #entity {
+                type Resp = Vec<Self>;
                 type Query = ();
 
                 fn page_response(page: lazybe::Page<Self>) -> Self::Resp {
-                    page
+                    page.data
                 }
 
                 fn page_input(_input: &Self::Query) -> Option<lazybe::PaginationInput> {

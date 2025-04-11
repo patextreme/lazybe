@@ -9,8 +9,11 @@ authors = ["Pat Losoponkul <pat.losoponkul@gmail.com>"]
 
 [workspace.dependencies]
 axum = "0.8"
+tracing = "0.1"
 sea-query = "0.32"
 serde = "1"
 sqlx = "0.8"
+utoipa = "5"
+uuid = "1"
 
 lazybe = { path = "./lazybe" }

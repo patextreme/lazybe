@@ -1,11 +1,13 @@
+use lazybe::{Entity, Newtype};
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Newtype)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Newtype, ToSchema)]
 pub struct StaffId(u64);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Entity)]
-#[lazybe(table = "staff", endpoint = "/staffs", collection_api = "default")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Entity, ToSchema)]
+#[lazybe(table = "staff", endpoint = "/staffs", collection_api = "list", derive_to_schema)]
 pub struct Staff {
     #[lazybe(primary_key)]
     pub id: StaffId,

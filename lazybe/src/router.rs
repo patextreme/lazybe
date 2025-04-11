@@ -1,11 +1,45 @@
-use axum::Router;
-use serde::Serialize;
+pub use axum::*;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use sqlx::{Database, Pool};
+use uuid::Uuid;
 
 use crate::filter::Filter;
 use crate::sort::Sort;
 use crate::{DbOps, Page, PaginationInput};
+
+/// https://www.rfc-editor.org/rfc/rfc9457#name-type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "oas", derive(utoipa::ToSchema))]
+pub struct ErrorResponse {
+    title: String,
+    detail: Option<String>,
+    instance: Option<String>,
+}
+
+impl ErrorResponse {
+    pub fn new(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            detail: None,
+            instance: None,
+        }
+    }
+
+    pub fn with_detail(self, detail: &str) -> Self {
+        Self {
+            detail: Some(detail.to_string()),
+            ..self
+        }
+    }
+
+    pub fn with_instance(self, id: Uuid) -> Self {
+        Self {
+            instance: Some(id.to_string()),
+            ..self
+        }
+    }
+}
 
 pub trait EntityCollectionApi: Sized {
     type Resp: Serialize;
@@ -60,9 +94,11 @@ pub mod sqlite {
     use serde::Serialize;
     use serde::de::DeserializeOwned;
     use sqlx::{Database, FromRow};
+    use uuid::Uuid;
 
     use super::{
-        CreateRouter, DeleteRouter, EntityCollectionApi, GetRouter, ListRouter, Routable, RouteConfig, UpdateRouter,
+        CreateRouter, DeleteRouter, EntityCollectionApi, ErrorResponse, GetRouter, ListRouter, Routable, RouteConfig,
+        UpdateRouter,
     };
     use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery, ListQuery, UpdateQuery};
 
@@ -78,9 +114,11 @@ pub mod postgres {
     use serde::Serialize;
     use serde::de::DeserializeOwned;
     use sqlx::{Database, FromRow};
+    use uuid::Uuid;
 
     use super::{
-        CreateRouter, DeleteRouter, EntityCollectionApi, GetRouter, ListRouter, Routable, RouteConfig, UpdateRouter,
+        CreateRouter, DeleteRouter, EntityCollectionApi, ErrorResponse, GetRouter, ListRouter, Routable, RouteConfig,
+        UpdateRouter,
     };
     use crate::{CreateQuery, DbOps, DeleteQuery, GetQuery, ListQuery, UpdateQuery};
 
@@ -109,7 +147,7 @@ mod macros {
             async fn get_endpoint_impl<T, S>(
                 Path(id): Path<<T as GetQuery>::Pk>,
                 State(state): State<S>,
-            ) -> Result<Json<T>, StatusCode>
+            ) -> Result<Json<T>, (StatusCode, Json<ErrorResponse>)>
             where
                 T: GetQuery + Routable + Serialize + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
@@ -117,11 +155,29 @@ mod macros {
                 <T as GetQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 let (ctx, pool) = state.db_ctx();
+                let url = <T as Routable>::entity_path();
                 let result = ctx
-                    .get::<T, _>(&pool, id)
+                    .get::<T, _>(&pool, id.clone())
                     .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-                    .ok_or(StatusCode::NOT_FOUND)?;
+                    .map_err(|e| {
+                        let instance = Uuid::new_v4();
+                        tracing::error!(?instance, ?url, ?id, "Failed to get an entity: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(
+                                ErrorResponse::new("Internal server error")
+                                    .with_detail("Unknown error occurred, please check the logs for more details.")
+                                    .with_instance(instance),
+                            ),
+                        )
+                    })?
+                    .ok_or((
+                        StatusCode::NOT_FOUND,
+                        Json(
+                            ErrorResponse::new("Not found")
+                                .with_detail(&format!("An entity with id {:?} was not found.", id)),
+                        ),
+                    ))?;
                 Ok(Json(result))
             }
 
@@ -141,7 +197,7 @@ mod macros {
             async fn list_endpoint_impl<T, S>(
                 State(state): State<S>,
                 Query(query): Query<<T as EntityCollectionApi>::Query>,
-            ) -> Result<Json<<T as EntityCollectionApi>::Resp>, StatusCode>
+            ) -> Result<Json<<T as EntityCollectionApi>::Resp>, (StatusCode, Json<ErrorResponse>)>
             where
                 T: ListQuery + EntityCollectionApi + Routable + Serialize + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
@@ -149,6 +205,7 @@ mod macros {
                 <T as EntityCollectionApi>::Query: Send,
             {
                 let (ctx, pool) = state.db_ctx();
+                let url = <T as Routable>::entity_collection_path();
 
                 let page_input = <T as EntityCollectionApi>::page_input(&query);
                 let filter_input = <T as EntityCollectionApi>::filter_input(&query);
@@ -156,7 +213,18 @@ mod macros {
                 let result = ctx
                     .list::<T, _>(&pool, filter_input, sort_input, page_input)
                     .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                    .map_err(|e| {
+                        let instance = Uuid::new_v4();
+                        tracing::error!(?instance, ?url, "Failed to list entities: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(
+                                ErrorResponse::new("Internal server error")
+                                    .with_detail("Unknown error occurred, please check the logs for more details.")
+                                    .with_instance(instance),
+                            ),
+                        )
+                    })?;
                 let page_resp = <T as EntityCollectionApi>::page_response(result);
                 Ok(Json(page_resp))
             }
@@ -177,7 +245,7 @@ mod macros {
             async fn create_endpoint_impl<T, S>(
                 State(state): State<S>,
                 Json(input): Json<<T as CreateQuery>::Create>,
-            ) -> Result<(StatusCode, Json<T>), StatusCode>
+            ) -> Result<(StatusCode, Json<T>), (StatusCode, Json<ErrorResponse>)>
             where
                 T: CreateQuery + Routable + Serialize + DeserializeOwned + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
@@ -185,10 +253,19 @@ mod macros {
                 <T as CreateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 let (ctx, pool) = state.db_ctx();
-                let result = ctx
-                    .create::<T, _>(&pool, input)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let url = <T as Routable>::entity_collection_path();
+                let result = ctx.create::<T, _>(&pool, input).await.map_err(|e| {
+                    let instance = Uuid::new_v4();
+                    tracing::error!(?instance, ?url, "Failed to create an entity: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(
+                            ErrorResponse::new("Internal server error")
+                                .with_detail("Unknown error occurred, please check the logs for more details.")
+                                .with_instance(instance),
+                        ),
+                    )
+                })?;
                 Ok((StatusCode::CREATED, Json(result)))
             }
 
@@ -207,16 +284,26 @@ mod macros {
             async fn delete_endpoint_impl<T, S>(
                 Path(id): Path<<T as DeleteQuery>::Pk>,
                 State(state): State<S>,
-            ) -> Result<Json<()>, StatusCode>
+            ) -> Result<Json<()>, (StatusCode, Json<ErrorResponse>)>
             where
                 T: DeleteQuery + Routable + Serialize + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as DeleteQuery>::Pk: DeserializeOwned + Send,
             {
                 let (ctx, pool) = state.db_ctx();
-                ctx.delete::<T, _>(&pool, id)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let url = <T as Routable>::entity_path();
+                ctx.delete::<T, _>(&pool, id.clone()).await.map_err(|e| {
+                    let instance = Uuid::new_v4();
+                    tracing::error!(?instance, ?url, ?id, "Failed to delete an entity: {}", e);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(
+                            ErrorResponse::new("Internal server error")
+                                .with_detail("Unknown error occurred, please check the logs for more details.")
+                                .with_instance(instance),
+                        ),
+                    )
+                })?;
                 Ok(Json(()))
             }
 
@@ -244,7 +331,7 @@ mod macros {
                 Path(id): Path<<T as UpdateQuery>::Pk>,
                 State(state): State<S>,
                 Json(input): Json<<T as UpdateQuery>::Update>,
-            ) -> Result<Json<T>, StatusCode>
+            ) -> Result<Json<T>, (StatusCode, Json<ErrorResponse>)>
             where
                 T: UpdateQuery + Routable + Serialize + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
@@ -253,11 +340,29 @@ mod macros {
                 <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 let (ctx, pool) = state.db_ctx();
+                let url = <T as Routable>::entity_path();
                 let result = ctx
-                    .update::<T, _>(&pool, id, input)
+                    .update::<T, _>(&pool, id.clone(), input)
                     .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-                    .ok_or(StatusCode::NOT_FOUND)?;
+                    .map_err(|e| {
+                        let instance = Uuid::new_v4();
+                        tracing::error!(?instance, ?url, ?id, "Failed to update an entity: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(
+                                ErrorResponse::new("Internal server error")
+                                    .with_detail("Unknown error occurred, please check the logs for more details.")
+                                    .with_instance(instance),
+                            ),
+                        )
+                    })?
+                    .ok_or((
+                        StatusCode::NOT_FOUND,
+                        Json(
+                            ErrorResponse::new("Not found")
+                                .with_detail(&format!("An entity with id {:?} was not found.", id)),
+                        ),
+                    ))?;
                 Ok(Json(result))
             }
 
@@ -265,7 +370,7 @@ mod macros {
                 Path(id): Path<<T as UpdateQuery>::Pk>,
                 State(state): State<S>,
                 Json(input): Json<<T as UpdateQuery>::Replace>,
-            ) -> Result<Json<T>, StatusCode>
+            ) -> Result<Json<T>, (StatusCode, Json<ErrorResponse>)>
             where
                 T: UpdateQuery + Routable + Serialize + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
@@ -274,12 +379,30 @@ mod macros {
                 <T as UpdateQuery>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 let (ctx, pool) = state.db_ctx();
+                let url = <T as Routable>::entity_path();
                 let patch_input: <T as UpdateQuery>::Update = input.into();
                 let result = ctx
-                    .update::<T, _>(&pool, id, patch_input)
+                    .update::<T, _>(&pool, id.clone(), patch_input)
                     .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-                    .ok_or(StatusCode::NOT_FOUND)?;
+                    .map_err(|e| {
+                        let instance = Uuid::new_v4();
+                        tracing::error!(?instance, ?url, ?id, "Failed to replace an entity: {}", e);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(
+                                ErrorResponse::new("Internal server error")
+                                    .with_detail("Unknown error occurred, please check the logs for more details.")
+                                    .with_instance(instance),
+                            ),
+                        )
+                    })?
+                    .ok_or((
+                        StatusCode::NOT_FOUND,
+                        Json(
+                            ErrorResponse::new("Not found")
+                                .with_detail(&format!("An entity with id {:?} was not found.", id)),
+                        ),
+                    ))?;
                 Ok(Json(result))
             }
         };

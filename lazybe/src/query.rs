@@ -1,7 +1,9 @@
+use std::fmt::Debug;
+
 use crate::filter::Filter;
 
 pub trait GetQuery {
-    type Pk;
+    type Pk: Debug + Clone;
     type Row;
     fn get_query(id: Self::Pk) -> sea_query::SelectStatement;
 }
@@ -18,7 +20,7 @@ pub trait CreateQuery {
 }
 
 pub trait UpdateQuery {
-    type Pk;
+    type Pk: Debug + Clone;
     type Update;
     type Replace: Into<Self::Update>;
     type Row;
@@ -26,6 +28,6 @@ pub trait UpdateQuery {
 }
 
 pub trait DeleteQuery {
-    type Pk;
+    type Pk: Debug + Clone;
     fn delete_query(id: Self::Pk) -> sea_query::DeleteStatement;
 }

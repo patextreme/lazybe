@@ -1,17 +1,19 @@
-use lazybe::PaginationInput;
-use lazybe::axum::EntityCollectionApi;
 use lazybe::filter::Filter;
+use lazybe::router::EntityCollectionApi;
 use lazybe::sort::Sort;
+use lazybe::{Entity, Enum, Newtype, Page, PaginationInput};
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
+use utoipa::ToSchema;
 
+use super::Paginated;
 use super::staff::StaffId;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Newtype)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Newtype, ToSchema)]
 pub struct TodoId(u64);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Entity)]
-#[lazybe(table = "todo", endpoint = "/todos")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Entity, ToSchema)]
+#[lazybe(table = "todo", endpoint = "/todos", derive_to_schema)]
 pub struct Todo {
     #[lazybe(primary_key)]
     pub id: TodoId,
@@ -25,14 +27,14 @@ pub struct Todo {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, lazybe::Enum)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Enum, ToSchema)]
 pub enum Status {
     Todo,
     Doing,
     Done,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct TodoCollectionQuery {
     pub status: Option<Status>,
     pub assignee: Option<StaffId>,
@@ -41,16 +43,16 @@ pub struct TodoCollectionQuery {
 }
 
 impl EntityCollectionApi for Todo {
-    type Resp = lazybe::Page<Todo>;
+    type Resp = Paginated<Todo>;
     type Query = TodoCollectionQuery;
 
-    fn page_response(page: lazybe::Page<Self>) -> Self::Resp {
-        page
+    fn page_response(page: Page<Self>) -> Self::Resp {
+        page.into()
     }
 
     fn page_input(input: &Self::Query) -> Option<PaginationInput> {
         Some(PaginationInput {
-            page: input.page.unwrap_or(0),
+            page: input.page.map(|n| n.max(1) - 1).unwrap_or(0),
             limit: input.size.unwrap_or(10).min(100),
         })
     }

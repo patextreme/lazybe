@@ -5,8 +5,7 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-axum = { workspace = true }
-lazybe = { workspace = true, features = ["axum", "sqlite", "postgres"] }
+lazybe = { workspace = true, features = ["sqlite", "postgres", "axum", "oas"] }
 sea-query = { workspace = true, features = ["with-chrono"] }
 serde = { workspace = true }
 sqlx = { workspace = true, features = [
@@ -15,7 +14,12 @@ sqlx = { workspace = true, features = [
   "sqlite",
   "postgres",
 ] }
+tracing = { workspace = true }
 
 anyhow = { version = "1" }
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1", features = ["full"] }
+tracing-subscriber = { version = "0.3" }
+utoipa = { version = "5", features = ["chrono"] }
+utoipa-axum = { version = "0.2" }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }

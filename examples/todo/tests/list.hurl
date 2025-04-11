@@ -52,10 +52,7 @@ HTTP 201
 GET {{ base_url }}/staffs
 HTTP 200
 [Asserts]
-jsonpath "$.page" == 0
-jsonpath "$.page_size" == 2
-jsonpath "$.total_records" == 2
-jsonpath "$.data" count == 2
+jsonpath "$" count == 2
 
 #######################################
 # List tasks
@@ -63,9 +60,10 @@ jsonpath "$.data" count == 2
 GET {{ base_url }}/todos
 HTTP 200
 [Asserts]
-jsonpath "$.page" == 0
+jsonpath "$.page" == 1
 jsonpath "$.page_size" == 10
 jsonpath "$.total_records" == 3
+jsonpath "$.total_pages" == 1
 jsonpath "$.data" count == 3
 
 GET {{ base_url }}/todos
@@ -73,9 +71,22 @@ GET {{ base_url }}/todos
 size: 2
 HTTP 200
 [Asserts]
-jsonpath "$.page" == 0
+jsonpath "$.page" == 1
 jsonpath "$.page_size" == 2
 jsonpath "$.total_records" == 3
+jsonpath "$.total_pages" == 2
+jsonpath "$.data" count == 2
+
+GET {{ base_url }}/todos
+[Query]
+page: 0
+size: 2
+HTTP 200
+[Asserts]
+jsonpath "$.page" == 1
+jsonpath "$.page_size" == 2
+jsonpath "$.total_records" == 3
+jsonpath "$.total_pages" == 2
 jsonpath "$.data" count == 2
 
 GET {{ base_url }}/todos
@@ -87,6 +98,19 @@ HTTP 200
 jsonpath "$.page" == 1
 jsonpath "$.page_size" == 2
 jsonpath "$.total_records" == 3
+jsonpath "$.total_pages" == 2
+jsonpath "$.data" count == 2
+
+GET {{ base_url }}/todos
+[Query]
+page: 2
+size: 2
+HTTP 200
+[Asserts]
+jsonpath "$.page" == 2
+jsonpath "$.page_size" == 2
+jsonpath "$.total_records" == 3
+jsonpath "$.total_pages" == 2
 jsonpath "$.data" count == 1
 
 #######################################
@@ -98,9 +122,10 @@ GET {{ base_url }}/todos
 status: Todo
 HTTP 200
 [Asserts]
-jsonpath "$.page" == 0
+jsonpath "$.page" == 1
 jsonpath "$.page_size" == 10
 jsonpath "$.total_records" == 3
+jsonpath "$.total_pages" == 1
 jsonpath "$.data" count == 3
 
 # Alice picks up a task
@@ -116,9 +141,10 @@ GET {{ base_url }}/todos
 status: Todo
 HTTP 200
 [Asserts]
-jsonpath "$.page" == 0
+jsonpath "$.page" == 1
 jsonpath "$.page_size" == 10
 jsonpath "$.total_records" == 2
+jsonpath "$.total_pages" == 1
 jsonpath "$.data" count == 2
 
 # All task with 'Doing' status
@@ -127,9 +153,10 @@ GET {{ base_url }}/todos
 status: Doing
 HTTP 200
 [Asserts]
-jsonpath "$.page" == 0
+jsonpath "$.page" == 1
 jsonpath "$.page_size" == 10
 jsonpath "$.total_records" == 1
+jsonpath "$.total_pages" == 1
 jsonpath "$.data" count == 1
 
 # All task with 'Todo' status assigned to Alice
@@ -139,7 +166,8 @@ status: Todo
 assignee: {{ alice_id }}
 HTTP 200
 [Asserts]
-jsonpath "$.page" == 0
+jsonpath "$.page" == 1
 jsonpath "$.page_size" == 10
 jsonpath "$.total_records" == 1
+jsonpath "$.total_pages" == 1
 jsonpath "$.data" count == 1

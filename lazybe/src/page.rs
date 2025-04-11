@@ -1,6 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct PaginationInput {
     /// 0-index page number (0 is the first page)
     pub page: u32,
@@ -19,7 +17,7 @@ impl PaginationInput {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Page<T> {
     pub page: u32,
     pub page_size: u64,

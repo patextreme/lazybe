@@ -5,14 +5,21 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-axum = { workspace = true }
+# core
 lazybe-macro = { path = "../lazybe-macro" }
+tracing = { workspace = true }
 sea-query = { workspace = true }
 serde = { workspace = true }
 sqlx = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+# optional
+axum = { workspace = true, optional = true }
+utoipa = { workspace = true, optional = true }
 
 [features]
 default = []
 sqlite = []
 postgres = []
-axum = []
+axum = ["dep:axum"]
+oas = ["axum", "dep:utoipa"]

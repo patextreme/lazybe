@@ -67,6 +67,7 @@
             buildInputs =
               (with pkgs; [
                 # base
+                curl
                 git
                 hurl
                 jq
