@@ -4,7 +4,7 @@ use lazybe::axum::Router;
 use lazybe::axum::extract::State;
 use lazybe::axum::http::StatusCode;
 use lazybe::axum::routing::get;
-use lazybe::oas::{CreateRouterOas, DeleteRouterOas, GetRouterOas, ListRouterOas, UpdateRouterOas};
+use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc, UpdateRouterDoc};
 use lazybe::router::{CreateRouter, DeleteRouter, GetRouter, ListRouter, RouteConfig, UpdateRouter};
 use lazybe::sqlite::SqliteDbCtx;
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
@@ -37,18 +37,18 @@ async fn main() -> anyhow::Result<()> {
     reset_db(&pool).await?;
 
     let endpoint_defs = [
-        (Todo::get_endpoint(), Todo::get_endpoint_oas()),
-        (Todo::list_endpoint(), Todo::list_endpoint_oas()),
-        (Todo::create_endpoint(), Todo::create_endpoint_oas()),
-        (Todo::update_endpoint(), Todo::update_endpoint_oas()),
-        (Todo::replace_endpoint(), Todo::replace_endpoint_oas()),
-        (Todo::delete_endpoint(), Todo::delete_endpoint_oas()),
-        (Staff::get_endpoint(), Staff::get_endpoint_oas()),
-        (Staff::list_endpoint(), Staff::list_endpoint_oas()),
-        (Staff::create_endpoint(), Staff::create_endpoint_oas()),
-        (Staff::update_endpoint(), Staff::update_endpoint_oas()),
-        (Staff::replace_endpoint(), Staff::replace_endpoint_oas()),
-        (Staff::delete_endpoint(), Staff::delete_endpoint_oas()),
+        (Todo::get_endpoint(), Todo::get_endpoint_doc()),
+        (Todo::list_endpoint(), Todo::list_endpoint_doc()),
+        (Todo::create_endpoint(), Todo::create_endpoint_doc()),
+        (Todo::update_endpoint(), Todo::update_endpoint_doc()),
+        (Todo::replace_endpoint(), Todo::replace_endpoint_doc()),
+        (Todo::delete_endpoint(), Todo::delete_endpoint_doc()),
+        (Staff::get_endpoint(), Staff::get_endpoint_doc()),
+        (Staff::list_endpoint(), Staff::list_endpoint_doc()),
+        (Staff::create_endpoint(), Staff::create_endpoint_doc()),
+        (Staff::update_endpoint(), Staff::update_endpoint_doc()),
+        (Staff::replace_endpoint(), Staff::replace_endpoint_doc()),
+        (Staff::delete_endpoint(), Staff::delete_endpoint_doc()),
     ];
 
     let app_state = AppState { ctx, pool };
