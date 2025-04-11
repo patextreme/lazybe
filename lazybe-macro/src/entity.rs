@@ -286,19 +286,19 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
     let derive_to_schema =
         Some(quote! { #[derive(utoipa::ToSchema)] }).filter(|_| entity_meta.entity_attr.derive_to_schema);
     quote! {
-        #[derive(Clone, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         #derive_to_schema
         #entity_vis struct #create_entity {
             #(#user_defined_field_defs),*
         }
 
-        #[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
         #derive_to_schema
         #entity_vis struct #patch_entity {
             #(#patch_entity_field_defs),*
         }
 
-        #[derive(Clone, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         #derive_to_schema
         #entity_vis struct #put_entity {
             #(#put_entity_field_defs),*
@@ -312,14 +312,14 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
             }
         }
 
-        #[derive(Clone)]
+        #[derive(Debug, Clone)]
         #entity_vis struct #filter_entity;
 
         impl #filter_entity {
             #(#filter_method_defs)*
         }
 
-        #[derive(Clone)]
+        #[derive(Debug, Clone)]
         #entity_vis struct #sort_entity;
 
         impl #sort_entity {
