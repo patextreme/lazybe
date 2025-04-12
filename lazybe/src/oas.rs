@@ -5,7 +5,7 @@ use utoipa::openapi::{Components, Content, HttpMethod, OpenApi, OpenApiBuilder, 
 use utoipa::{PartialSchema, ToSchema};
 
 use crate::router::{EntityCollectionApi, ErrorResponse, Routable};
-use crate::{CreateQuery, DeleteQuery, GetQuery, ListQuery, UpdateQuery};
+use crate::{CreateQuery, DeleteQuery, Entity, GetQuery, ListQuery, UpdateQuery};
 
 const APPLICATION_JSON: &str = "application/json";
 
@@ -96,12 +96,12 @@ where
 impl<T> CreateRouterDoc for T
 where
     T: CreateQuery + Routable + ToSchema,
-    <T as CreateQuery>::Create: ToSchema,
+    <T as Entity>::Create: ToSchema,
 {
     fn create_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()
             .summary(Some(format!("Create a new {} entity", <T as ToSchema>::name())))
-            .json_request::<<T as CreateQuery>::Create>()
+            .json_request::<<T as Entity>::Create>()
             .json_response::<T>(StatusCode::CREATED, "Entity created successfully")
             .error_response(StatusCode::BAD_REQUEST)
             .error_response(StatusCode::INTERNAL_SERVER_ERROR)
@@ -114,7 +114,7 @@ where
 
         let components = {
             let mut schemas = Vec::new();
-            <<T as CreateQuery>::Create as ToSchema>::schemas(&mut schemas);
+            <<T as Entity>::Create as ToSchema>::schemas(&mut schemas);
             Components::builder().schemas_from_iter(schemas).build()
         };
 
@@ -125,8 +125,8 @@ where
 impl<T> UpdateRouterDoc for T
 where
     T: UpdateQuery + Routable + ToSchema,
-    <T as UpdateQuery>::Update: ToSchema,
-    <T as UpdateQuery>::Replace: ToSchema,
+    <T as Entity>::Update: ToSchema,
+    <T as Entity>::Replace: ToSchema,
 {
     fn update_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()
@@ -135,7 +135,7 @@ where
                 <T as ToSchema>::name()
             )))
             .parameter(Parameter::new("id"))
-            .json_request::<<T as UpdateQuery>::Update>()
+            .json_request::<<T as Entity>::Update>()
             .json_response::<T>(StatusCode::OK, "Entity updated successfully")
             .error_response(StatusCode::BAD_REQUEST)
             .error_response(StatusCode::NOT_FOUND)
@@ -149,7 +149,7 @@ where
 
         let components = {
             let mut schemas = Vec::new();
-            <<T as UpdateQuery>::Update as ToSchema>::schemas(&mut schemas);
+            <<T as Entity>::Update as ToSchema>::schemas(&mut schemas);
             Components::builder().schemas_from_iter(schemas).build()
         };
 
@@ -160,7 +160,7 @@ where
         let operation = Operation::builder()
             .summary(Some(format!("Replace an existing {}", <T as ToSchema>::name())))
             .parameter(Parameter::new("id"))
-            .json_request::<<T as UpdateQuery>::Replace>()
+            .json_request::<<T as Entity>::Replace>()
             .json_response::<T>(StatusCode::OK, "Entity replaced successfully")
             .error_response(StatusCode::BAD_REQUEST)
             .error_response(StatusCode::NOT_FOUND)
@@ -174,7 +174,7 @@ where
 
         let components = {
             let mut schemas = Vec::new();
-            <<T as UpdateQuery>::Replace as ToSchema>::schemas(&mut schemas);
+            <<T as Entity>::Replace as ToSchema>::schemas(&mut schemas);
             Components::builder().schemas_from_iter(schemas).build()
         };
 

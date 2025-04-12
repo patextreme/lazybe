@@ -1,4 +1,4 @@
-use lazybe::Page;
+use lazybe::page::Page;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 

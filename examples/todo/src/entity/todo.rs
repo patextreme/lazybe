@@ -1,7 +1,8 @@
 use lazybe::filter::Filter;
+use lazybe::macros::{Entity, Enum, Newtype};
+use lazybe::page::{Page, PaginationInput};
 use lazybe::router::EntityCollectionApi;
 use lazybe::sort::Sort;
-use lazybe::{Entity, Enum, Newtype, Page, PaginationInput};
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
 use utoipa::ToSchema;
@@ -13,7 +14,7 @@ use super::staff::StaffId;
 pub struct TodoId(u64);
 
 #[derive(Debug, Clone, Serialize, Deserialize, Entity, ToSchema)]
-#[lazybe(table = "todo", endpoint = "/todos", derive_to_schema)]
+#[lazybe(table = "todo", endpoint = "/todos", collection_api = "manual", derive_to_schema)]
 pub struct Todo {
     #[lazybe(primary_key)]
     pub id: TodoId,
