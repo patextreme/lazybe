@@ -454,6 +454,7 @@ dependencies = [
  "lazybe",
  "sea-query",
  "serde",
+ "serde_json",
  "sqlx",
  "tokio",
  "tracing",
@@ -1501,6 +1502,7 @@ dependencies = [
  "chrono",
  "inherent",
  "sea-query-derive",
+ "serde_json",
 ]
 
 [[package]]

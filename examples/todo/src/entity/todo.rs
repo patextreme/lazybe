@@ -12,7 +12,7 @@ use super::staff::StaffId;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Newtype, ToSchema)]
 pub struct TodoId(u64);
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Entity, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, Entity, ToSchema)]
 #[lazybe(table = "todo", endpoint = "/todos", derive_to_schema)]
 pub struct Todo {
     #[lazybe(primary_key)]

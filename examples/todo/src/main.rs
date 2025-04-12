@@ -36,6 +36,12 @@ async fn main() -> anyhow::Result<()> {
     let pool = SqlitePool::connect("sqlite::memory:").await?;
     reset_db(&pool).await?;
 
+    let mut app = Router::new();
+    let mut oas = OpenApiBuilder::new()
+        .info(Info::new("Todo Example", "0.1.0"))
+        .servers(Some([Server::new("http://localhost:8080")]))
+        .build();
+
     let endpoint_defs = [
         (Todo::get_endpoint(), Todo::get_endpoint_doc()),
         (Todo::list_endpoint(), Todo::list_endpoint_doc()),
@@ -50,27 +56,19 @@ async fn main() -> anyhow::Result<()> {
         (Staff::replace_endpoint(), Staff::replace_endpoint_doc()),
         (Staff::delete_endpoint(), Staff::delete_endpoint_doc()),
     ];
-
-    let app_state = AppState { ctx, pool };
-    let mut app = Router::new();
-
-    let mut oas = OpenApiBuilder::new()
-        .info(Info::new("Todo Example", "0.1.0"))
-        .servers(Some([Server::new("http://localhost:8080")]))
-        .build();
-
     for (endpoint_router, endpoint_doc) in endpoint_defs {
         app = app.merge(endpoint_router);
         oas = oas.merge_from(endpoint_doc);
     }
 
-    let app = app
+    let app_router = app
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", oas))
-        .route("/_system/reset", get(reset_handler));
+        .route("/_system/reset", get(reset_handler))
+        .with_state(AppState { ctx, pool });
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
     tracing::info!("Server is listening on 0.0.0.0:8080");
-    lazybe::axum::serve(listener, app.with_state(app_state)).await?;
+    lazybe::axum::serve(listener, app_router).await?;
     Ok(())
 }
 

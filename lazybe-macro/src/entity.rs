@@ -30,6 +30,8 @@ struct EntityFieldAttr {
     created_at: bool,
     #[darling(default)]
     updated_at: bool,
+    #[darling(default)]
+    json: bool,
 }
 
 struct EntityMeta {
@@ -106,6 +108,16 @@ impl EntityMeta {
             .into_iter()
             .map(|i| format_ident!("{}", i.to_string().to_case(Case::Pascal)))
             .collect::<Vec<_>>()
+    }
+
+    /// Return field ident with snake_case and PascalCase and attr
+    fn user_defined_fields_ident_with_attr(&self) -> Vec<(Ident, Ident, EntityFieldAttr)> {
+        self.user_defined_fields
+            .iter()
+            .flat_map(|(field, attr)| field.ident.as_ref().cloned().map(|i| (i, attr.clone())))
+            .zip(self.user_defined_fields_ident_pascal())
+            .map(|((ident_snake, attr), ident_pascal)| (ident_snake, ident_pascal, attr))
+            .collect()
     }
 
     fn try_parse(input: &DeriveInput, fields: &FieldsNamed) -> syn::Result<Self> {
@@ -286,19 +298,19 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
     let derive_to_schema =
         Some(quote! { #[derive(utoipa::ToSchema)] }).filter(|_| entity_meta.entity_attr.derive_to_schema);
     quote! {
-        #[derive(Clone, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         #derive_to_schema
         #entity_vis struct #create_entity {
             #(#user_defined_field_defs),*
         }
 
-        #[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
         #derive_to_schema
         #entity_vis struct #patch_entity {
             #(#patch_entity_field_defs),*
         }
 
-        #[derive(Clone, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
         #derive_to_schema
         #entity_vis struct #put_entity {
             #(#put_entity_field_defs),*
@@ -312,14 +324,14 @@ fn entity_types_impl(entity_meta: &EntityMeta) -> TokenStream {
             }
         }
 
-        #[derive(Clone)]
+        #[derive(Debug, Clone)]
         #entity_vis struct #filter_entity;
 
         impl #filter_entity {
             #(#filter_method_defs)*
         }
 
-        #[derive(Clone)]
+        #[derive(Debug, Clone)]
         #entity_vis struct #sort_entity;
 
         impl #sort_entity {
@@ -342,14 +354,22 @@ fn entity_row_impl(entity_meta: &EntityMeta) -> TokenStream {
             #ident_pascal
         }
     });
-    let all_field_defs = entity_meta.all_fields.iter().map(|(f, _)| {
+    let all_field_defs = entity_meta.all_fields.iter().map(|(f, attr)| {
         let ident = f.ident.as_ref().unwrap();
         let ty = &f.ty;
-        quote! { #ident: #ty }
+        if attr.json {
+            quote! { #ident: sqlx::types::Json<#ty> }
+        } else {
+            quote! { #ident: #ty }
+        }
     });
-    let all_field_intos = entity_meta.all_fields.iter().map(|(f, _)| {
+    let all_field_intos = entity_meta.all_fields.iter().map(|(f, attr)| {
         let ident = f.ident.as_ref().unwrap();
-        quote! { #ident: value.#ident }
+        if attr.json {
+            quote! { #ident: value.#ident.0 }
+        } else {
+            quote! { #ident: value.#ident }
+        }
     });
     quote! {
         #[derive(sqlx::FromRow)]
@@ -444,7 +464,17 @@ fn create_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let create_entity = &entity_meta.create_entity;
     let sqlx_row_ident = &entity_meta.sqlx_row_ident;
     let sea_query_ident = &entity_meta.sea_query_ident;
-    let user_defined_fields_ident = entity_meta.user_defined_fields_ident();
+    let user_defined_fields_value =
+        entity_meta
+            .user_defined_fields_ident_with_attr()
+            .into_iter()
+            .map(|(ident, _, attr)| {
+                if attr.json {
+                    quote! { serde_json::to_value(input.#ident).unwrap().into() }
+                } else {
+                    quote! { input.#ident.into() }
+                }
+            });
     let user_defined_fields_ident_pascal = entity_meta.user_defined_fields_ident_pascal();
     let now_value = Some(quote! { let now = sqlx::types::chrono::Utc::now(); })
         .filter(|_| entity_meta.created_at.is_some() || entity_meta.updated_at.is_some());
@@ -480,7 +510,7 @@ fn create_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
                         #(#updated_at_ident_pascal,)*
                     ])
                    .values_panic([
-                        #(input.#user_defined_fields_ident.into(),)*
+                        #(#user_defined_fields_value,)*
                         #(#created_at_value,)*
                         #(#updated_at_value,)*
                     ])
@@ -501,17 +531,26 @@ fn update_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let pk_ident_pascal = entity_meta.primary_key_ident_pascal();
     let now_value = Some(quote! { let now = sqlx::types::chrono::Utc::now(); })
         .filter(|_| entity_meta.created_at.is_some() || entity_meta.updated_at.is_some());
-    let update_user_defined_fields = entity_meta
-        .user_defined_fields_ident()
-        .into_iter()
-        .zip(entity_meta.user_defined_fields_ident_pascal())
-        .map(|(ident, ident_pascal)| {
-            quote! {
-                if let Some(new_value) = input.#ident {
-                    values.push((#sea_query_ident::#ident_pascal, new_value.into()));
+    let update_user_defined_fields =
+        entity_meta
+            .user_defined_fields_ident_with_attr()
+            .into_iter()
+            .map(|(ident, ident_pascal, attr)| {
+                if attr.json {
+                    quote! {
+                        if let Some(new_value) = input.#ident {
+                            let json = serde_json::to_value(new_value).unwrap();
+                            values.push((#sea_query_ident::#ident_pascal, json.into()));
+                        }
+                    }
+                } else {
+                    quote! {
+                        if let Some(new_value) = input.#ident {
+                            values.push((#sea_query_ident::#ident_pascal, new_value.into()));
+                        }
+                    }
                 }
-            }
-        });
+            });
     let update_updated_at = entity_meta
         .updated_at_ident_pascal()
         .map(|ident| {
