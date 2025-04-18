@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::NaiveDate;
 use lazybe::db::DbOps;
 use lazybe::db::sqlite::SqliteDbCtx;
 use lazybe::macros::Entity;
@@ -20,14 +20,20 @@ async fn main() -> anyhow::Result<()> {
         author: "J. K. Rowling".to_string(),
         publication_date: NaiveDate::from_ymd_opt(1998, 7, 2).unwrap(),
     };
+    let update_book_1 = UpdateBook {
+        title: Some("Harry Potter and the Philosopher's Stone".to_string()),
+        ..Default::default()
+    };
 
     let mut tx = pool.begin().await?;
     let book_1 = ctx.create::<Book>(&mut tx, create_book_1).await?;
     let book_2 = ctx.create::<Book>(&mut tx, create_book_2).await?;
+    let book_1_updated = ctx.update::<Book>(&mut tx, book_1.id, update_book_1).await?;
     tx.commit().await?;
 
     println!("book_1: {:?}", book_1);
     println!("book_2: {:?}", book_2);
+    println!("book_1 (updated): {:?}", book_1_updated.unwrap());
 
     Ok(())
 }
@@ -40,8 +46,6 @@ pub struct Book {
     pub title: String,
     pub author: String,
     pub publication_date: NaiveDate,
-    #[lazybe(created_at)]
-    pub created_at: DateTime<Utc>,
 }
 
 async fn migrate(pool: &SqlitePool) -> anyhow::Result<()> {
@@ -51,8 +55,7 @@ CREATE TABLE IF NOT EXISTS book (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     author TEXT NOT NULL,
-    publication_date DATE NOT NULL,
-    created_at DATETIME NOT NULL
+    publication_date DATE NOT NULL
 );
         "#,
     )

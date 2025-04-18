@@ -87,8 +87,6 @@ pub struct Book {
     pub title: String,
     pub author: String,
     pub publication_date: NaiveDate,
-    #[lazybe(created_at)]
-    pub created_at: DateTime<Utc>,
 }
 
 async fn migrate(pool: &SqlitePool) -> anyhow::Result<()> {
@@ -98,8 +96,7 @@ CREATE TABLE IF NOT EXISTS book (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     author TEXT NOT NULL,
-    publication_date DATE NOT NULL,
-    created_at DATETIME NOT NULL
+    publication_date DATE NOT NULL
 );
         "#,
     )
