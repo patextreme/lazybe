@@ -1,5 +1,4 @@
-use entity::staff::Staff;
-use entity::todo::{Todo, TodoBulkCreate};
+use entity::todo::Todo;
 use lazybe::axum::Router;
 use lazybe::axum::extract::State;
 use lazybe::axum::http::StatusCode;
@@ -9,7 +8,7 @@ use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc,
 use lazybe::router::{CreateRouter, DeleteRouter, GetRouter, ListRouter, RouteConfig, UpdateRouter};
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 use utoipa::openapi::{Info, OpenApiBuilder, Server};
-use utoipa_swagger_ui::SwaggerUi;
+use utoipa_redoc::{Redoc, Servable};
 
 mod entity;
 
@@ -37,33 +36,26 @@ async fn main() -> anyhow::Result<()> {
     reset_db(&pool).await?;
 
     let mut app = Router::new();
-    let mut oas = OpenApiBuilder::new()
+    let mut openapi = OpenApiBuilder::new()
         .info(Info::new("Todo Example", "0.1.0"))
         .servers(Some([Server::new("http://localhost:8080")]))
         .build();
 
     let endpoint_defs = [
-        (TodoBulkCreate::create_endpoint(), TodoBulkCreate::create_endpoint_doc()),
         (Todo::get_endpoint(), Todo::get_endpoint_doc()),
         (Todo::list_endpoint(), Todo::list_endpoint_doc()),
         (Todo::create_endpoint(), Todo::create_endpoint_doc()),
         (Todo::update_endpoint(), Todo::update_endpoint_doc()),
         (Todo::replace_endpoint(), Todo::replace_endpoint_doc()),
         (Todo::delete_endpoint(), Todo::delete_endpoint_doc()),
-        (Staff::get_endpoint(), Staff::get_endpoint_doc()),
-        (Staff::list_endpoint(), Staff::list_endpoint_doc()),
-        (Staff::create_endpoint(), Staff::create_endpoint_doc()),
-        (Staff::update_endpoint(), Staff::update_endpoint_doc()),
-        (Staff::replace_endpoint(), Staff::replace_endpoint_doc()),
-        (Staff::delete_endpoint(), Staff::delete_endpoint_doc()),
     ];
     for (endpoint_router, endpoint_doc) in endpoint_defs {
         app = app.merge(endpoint_router);
-        oas = oas.merge_from(endpoint_doc);
+        openapi = openapi.merge_from(endpoint_doc);
     }
 
     let app_router = app
-        .merge(SwaggerUi::new("/").url("/api-docs/openapi.json", oas))
+        .merge(Redoc::with_url("/", openapi))
         .route("/_system/reset", get(reset_handler))
         .with_state(AppState { ctx, pool });
 
@@ -83,34 +75,15 @@ async fn reset_handler(State(state): State<AppState>) -> Result<(), StatusCode> 
 async fn reset_db(pool: &Pool<Sqlite>) -> anyhow::Result<()> {
     pool.execute(
         r#"
-DROP TABLE IF EXISTS todo_recur;
 DROP TABLE IF EXISTS todo;
-DROP TABLE IF EXISTS staff;
-
-CREATE TABLE IF NOT EXISTS staff (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
-);
 
 CREATE TABLE IF NOT EXISTS todo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     description TEXT,
     status TEXT NOT NULL,
-    assignee INTEGER NOT NULL,
     created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
-    FOREIGN KEY (assignee) REFERENCES staff(id) ON DELETE RESTRICT
-);
-
-CREATE TABLE IF NOT EXISTS todo_recur (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    todo_id INTEGER NOT NULL,
-    interval TEXT NOT NULL,
-    max_occurance INTEGER,
-    FOREIGN KEY (todo_id) REFERENCES todo(id) ON DELETE RESTRICT
+    updated_at DATETIME NOT NULL
 );
         "#,
     )

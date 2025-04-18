@@ -36,7 +36,7 @@ where
 {
     fn get_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()
-            .summary(Some(format!("Get {} entity by ID", <T as ToSchema>::name())))
+            .summary(Some(format!("Get {} by ID", <T as ToSchema>::name())))
             .parameter(Parameter::new("id"))
             .json_response::<T>(StatusCode::OK, "Entity retrieved successfully")
             .error_response(StatusCode::BAD_REQUEST)
@@ -67,7 +67,7 @@ where
 {
     fn list_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()
-            .summary(Some(format!("List {} entity", <T as ToSchema>::name())))
+            .summary(Some(format!("List {}", <T as ToSchema>::name())))
             .query_object_param::<<T as EntityCollectionApi>::Query>()
             .json_response::<<T as EntityCollectionApi>::Resp>(StatusCode::OK, "Entities retrieved successfully")
             .error_response(StatusCode::BAD_REQUEST)
@@ -131,7 +131,7 @@ where
     fn update_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()
             .summary(Some(format!(
-                "Parital update an existing {} entity",
+                "Partial update {}",
                 <T as ToSchema>::name()
             )))
             .parameter(Parameter::new("id"))
@@ -158,7 +158,7 @@ where
 
     fn replace_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()
-            .summary(Some(format!("Replace an existing {}", <T as ToSchema>::name())))
+            .summary(Some(format!("Replace {}", <T as ToSchema>::name())))
             .parameter(Parameter::new("id"))
             .json_request::<<T as Entity>::Replace>()
             .json_response::<T>(StatusCode::OK, "Entity replaced successfully")
@@ -188,7 +188,7 @@ where
 {
     fn delete_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()
-            .summary(Some(format!("Delete {} entity by ID", <T as ToSchema>::name())))
+            .summary(Some(format!("Delete {} by ID", <T as ToSchema>::name())))
             .parameter(Parameter::new("id"))
             .response("200", Response::new("Entity deleted successfully"))
             .error_response(StatusCode::BAD_REQUEST)

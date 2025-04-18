@@ -1,12 +1,7 @@
-use lazybe::db::{DbCtx, DbOps};
-use lazybe::entity::ops::CreateEntity;
-use lazybe::macros::{Entity, EntityEndpoint, Enum, Newtype};
+use lazybe::macros::{Entity, Enum, Newtype};
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
-use sqlx::{Sqlite, Transaction};
 use utoipa::ToSchema;
-
-use super::staff::StaffId;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Newtype, ToSchema)]
 pub struct TodoId(u64);
@@ -19,7 +14,6 @@ pub struct Todo {
     pub title: String,
     pub description: Option<String>,
     pub status: Status,
-    pub assignee: StaffId,
     #[lazybe(created_at)]
     pub created_at: DateTime<Utc>,
     #[lazybe(updated_at)]
@@ -31,24 +25,4 @@ pub enum Status {
     Todo,
     Doing,
     Done,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, EntityEndpoint, ToSchema)]
-#[lazybe(endpoint = "/bulk/todos", create_ty = "Vec<CreateTodo>")]
-pub struct TodoBulkCreate {
-    todos: Vec<Todo>,
-}
-
-impl CreateEntity<Sqlite> for TodoBulkCreate {
-    async fn create<Ctx>(ctx: &Ctx, tx: &mut Transaction<'_, Sqlite>, input: Self::Create) -> Result<Self, sqlx::Error>
-    where
-        Ctx: DbCtx<Sqlite> + Sync,
-    {
-        let mut todos = Vec::with_capacity(input.len());
-        for create_todo in input {
-            let todo = ctx.create::<Todo>(tx, create_todo).await?;
-            todos.push(todo);
-        }
-        Ok(TodoBulkCreate { todos })
-    }
 }
