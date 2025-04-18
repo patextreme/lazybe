@@ -1,4 +1,3 @@
-use entity::todo::Todo;
 use lazybe::axum::Router;
 use lazybe::axum::extract::State;
 use lazybe::axum::http::StatusCode;
@@ -7,10 +6,11 @@ use lazybe::db::postgres::PostgresDbCtx;
 use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc, UpdateRouterDoc};
 use lazybe::router::{CreateRouter, DeleteRouter, GetRouter, ListRouter, RouteConfig, UpdateRouter};
 use sqlx::{Executor, PgPool, Pool, Postgres};
+use todo::Todo;
 use utoipa::openapi::{Info, OpenApiBuilder, Server};
 use utoipa_redoc::{Redoc, Servable};
 
-mod entity;
+mod todo;
 
 #[derive(Clone)]
 struct AppState {

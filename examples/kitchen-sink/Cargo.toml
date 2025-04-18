@@ -1,0 +1,26 @@
+[package]
+name = "example-kitchen-sink"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+lazybe = { workspace = true, features = ["sqlite", "axum", "oas"] }
+sea-query = { workspace = true, features = ["with-chrono", "with-json"] }
+serde = { workspace = true }
+sqlx = { workspace = true, features = [
+  "runtime-tokio",
+  "chrono",
+  "json",
+  "sqlite",
+] }
+tracing = { workspace = true }
+
+anyhow = { version = "1" }
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = { version = "1" }
+tokio = { version = "1", features = ["full"] }
+tracing-subscriber = { version = "0.3" }
+utoipa = { version = "5", features = ["chrono"] }
+utoipa-axum = { version = "0.2" }
+utoipa-redoc = { version = "6", features = ["axum"] }
