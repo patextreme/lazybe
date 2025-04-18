@@ -1,32 +1,10 @@
 use convert_case::{Case, Casing};
-use darling::{FromDeriveInput, FromField, FromMeta};
+use darling::{FromDeriveInput, FromField};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{Data, DataStruct, DeriveInput, Fields, FieldsNamed, Ident, Type, Visibility};
 
-#[derive(Clone, FromMeta)]
-enum CollectionApi {
-    Default,
-    Manual,
-}
-
-impl Default for CollectionApi {
-    fn default() -> Self {
-        Self::Default
-    }
-}
-
-#[derive(Clone, FromMeta)]
-enum ValidationHook {
-    Default,
-    Manual,
-}
-
-impl Default for ValidationHook {
-    fn default() -> Self {
-        Self::Default
-    }
-}
+use crate::common::{self, CollectionApi, ValidationHook};
 
 #[derive(Clone, FromDeriveInput)]
 #[darling(attributes(lazybe))]
@@ -373,65 +351,25 @@ fn entity_route_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let Some(base_url) = entity_meta.attr.endpoint.as_ref() else {
         return TokenStream::new();
     };
-    let get_path = format!("{}/{{id}}", base_url);
-    let list_path = base_url.to_string();
-    quote! {
-        impl lazybe::router::Routable for #entity {
-            fn entity_path() -> &'static str {
-                #get_path
-            }
-            fn entity_collection_path() -> &'static str {
-                #list_path
-            }
-        }
-    }
+    common::entity_route_trait_impl(entity, base_url)
 }
 
 fn entity_collection_api_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     if entity_meta.attr.endpoint.is_none() {
         return TokenStream::new();
     }
-    let entity = &entity_meta.entity_ident;
-    let sort_entity = &entity_meta.sort_entity;
-    let pk_ident = &entity_meta.primary_key.ident;
-    match entity_meta.attr.collection_api {
-        CollectionApi::Manual => TokenStream::new(),
-        CollectionApi::Default => quote! {
-            impl lazybe::router::EntityCollectionApi for #entity {
-                type Resp = Vec<Self>;
-                type Query = ();
-
-                fn page_response(page: lazybe::page::Page<Self>) -> Self::Resp {
-                    page.data
-                }
-
-                fn page_input(_input: &Self::Query) -> Option<lazybe::page::PaginationInput> {
-                    None
-                }
-
-                fn filter_input(_input: &Self::Query) -> lazybe::filter::Filter<Self> {
-                    lazybe::filter::Filter::empty()
-                }
-
-                fn sort_input(_input: &Self::Query) -> lazybe::sort::Sort<Self> {
-                    lazybe::sort::Sort::new([#sort_entity::#pk_ident().asc()])
-                }
-            }
-        },
-    }
+    common::entity_collection_api_trait_impl(
+        &entity_meta.entity_ident,
+        &entity_meta.attr.collection_api,
+        Some((&entity_meta.primary_key.ident, &entity_meta.sort_entity)),
+    )
 }
 
 fn entity_validation_hook_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     if entity_meta.attr.endpoint.is_none() {
         return TokenStream::new();
     }
-    let entity = &entity_meta.entity_ident;
-    match entity_meta.attr.validation {
-        ValidationHook::Manual => TokenStream::new(),
-        ValidationHook::Default => {
-            quote! { impl lazybe::router::ValidationHook for #entity {} }
-        }
-    }
+    common::entity_validation_hook_trait_impl(&entity_meta.entity_ident, &entity_meta.attr.validation)
 }
 
 fn entity_entity_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
@@ -444,7 +382,6 @@ fn entity_entity_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let row_entity = &entity_meta.sqlx_row_ident;
     quote! {
         impl lazybe::Entity for #entity {
-            type Row = #row_entity;
             type Pk = #pk_ty;
             type Create = #create_entity;
             type Update = #update_entity;
@@ -453,6 +390,10 @@ fn entity_entity_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
             fn entity_name() -> &'static str {
                 #entity_str
             }
+        }
+
+        impl lazybe::TableEntity for #entity {
+            type Row = #row_entity;
         }
     }
 }
@@ -513,7 +454,7 @@ fn create_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
         .map(|_| quote! { now.into() })
         .into_iter();
     quote! {
-        impl lazybe::CreateQuery for #entity {
+        impl lazybe::query::CreateQuery for #entity {
             fn create_query(input: Self::Create) -> sea_query::InsertStatement {
                 #now_value
                 sea_query::Query::insert()
@@ -568,7 +509,7 @@ fn update_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
         })
         .into_iter();
     quote! {
-        impl lazybe::UpdateQuery for #entity {
+        impl lazybe::query::UpdateQuery for #entity {
             fn update_query(id: Self::Pk, input: Self::Update) -> sea_query::UpdateStatement {
                 #now_value
 
@@ -596,7 +537,7 @@ fn get_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let pk_ident_pascal = &entity_meta.primary_key.ident_pascal;
     let all_field_idents_pascal = entity_meta.all_fields.iter().map(|f| f.ident_pascal.clone());
     quote! {
-        impl lazybe::GetQuery for #entity {
+        impl lazybe::query::GetQuery for #entity {
             fn get_query(id: Self::Pk) -> sea_query::SelectStatement {
                 sea_query::Query::select()
                     .columns([
@@ -618,7 +559,7 @@ fn list_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let sea_query_ident = &entity_meta.sea_query_ident;
     let all_field_idents_pascal = entity_meta.all_fields.iter().map(|f| f.ident_pascal.clone());
     quote! {
-        impl lazybe::ListQuery for #entity {
+        impl lazybe::query::ListQuery for #entity {
             fn list_query(filter: lazybe::filter::Filter<Self>) -> sea_query::SelectStatement {
                 sea_query::Query::select()
                     .columns([
@@ -637,7 +578,7 @@ fn delete_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
     let sea_query_ident = &entity_meta.sea_query_ident;
     let pk_ident_pascal = &entity_meta.primary_key.ident_pascal;
     quote! {
-        impl lazybe::DeleteQuery for #entity {
+        impl lazybe::query::DeleteQuery for #entity {
             fn delete_query(id: Self::Pk) -> sea_query::DeleteStatement {
                 sea_query::Query::delete()
                     .from_table(#sea_query_ident::Table)

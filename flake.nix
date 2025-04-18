@@ -87,7 +87,7 @@
               cd ${rootDir}
             '';
 
-            RUST_LOG = "info,lazybe::db=debug";
+            RUST_LOG = "info,lazybe::db=debug,sqlx::query=debug";
           };
       }
     );

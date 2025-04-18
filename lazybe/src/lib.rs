@@ -1,12 +1,10 @@
-pub use db::*;
-pub use entity::*;
-pub use query::*;
+pub use entity::{Entity, TableEntity};
 
-mod db;
-mod entity;
+pub mod db;
+pub mod entity;
 pub mod filter;
 pub mod page;
-mod query;
+pub mod query;
 pub mod sort;
 
 pub mod uuid {

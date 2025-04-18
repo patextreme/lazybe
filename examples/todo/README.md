@@ -15,5 +15,5 @@ __Prerequisites__
 - [Hurl](https://hurl.dev/)
 
 ```bash
-hurl --variables-file tests/env ./tests/*.hurl
+hurl --variables-file tests/env ./tests/*.hurl --test --jobs 1
 ```

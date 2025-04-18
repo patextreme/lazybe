@@ -4,8 +4,8 @@ use utoipa::openapi::request_body::RequestBody;
 use utoipa::openapi::{Components, Content, HttpMethod, OpenApi, OpenApiBuilder, PathItem, Paths, Response};
 use utoipa::{PartialSchema, ToSchema};
 
+use crate::Entity;
 use crate::router::{EntityCollectionApi, ErrorResponse, Routable};
-use crate::{CreateQuery, DeleteQuery, Entity, GetQuery, ListQuery, UpdateQuery};
 
 const APPLICATION_JSON: &str = "application/json";
 
@@ -32,7 +32,7 @@ pub trait DeleteRouterDoc {
 
 impl<T> GetRouterDoc for T
 where
-    T: GetQuery + Routable + ToSchema,
+    T: Entity + Routable + ToSchema,
 {
     fn get_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()
@@ -61,7 +61,7 @@ where
 
 impl<T> ListRouterDoc for T
 where
-    T: ListQuery + EntityCollectionApi + Routable + ToSchema,
+    T: Entity + EntityCollectionApi + Routable + ToSchema,
     <T as EntityCollectionApi>::Resp: ToSchema,
     <T as EntityCollectionApi>::Query: ToSchema,
 {
@@ -95,12 +95,12 @@ where
 
 impl<T> CreateRouterDoc for T
 where
-    T: CreateQuery + Routable + ToSchema,
+    T: Entity + Routable + ToSchema,
     <T as Entity>::Create: ToSchema,
 {
     fn create_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()
-            .summary(Some(format!("Create a new {} entity", <T as ToSchema>::name())))
+            .summary(Some(format!("Create a new {}", <T as ToSchema>::name())))
             .json_request::<<T as Entity>::Create>()
             .json_response::<T>(StatusCode::CREATED, "Entity created successfully")
             .error_response(StatusCode::BAD_REQUEST)
@@ -124,7 +124,7 @@ where
 
 impl<T> UpdateRouterDoc for T
 where
-    T: UpdateQuery + Routable + ToSchema,
+    T: Entity + Routable + ToSchema,
     <T as Entity>::Update: ToSchema,
     <T as Entity>::Replace: ToSchema,
 {
@@ -184,7 +184,7 @@ where
 
 impl<T> DeleteRouterDoc for T
 where
-    T: DeleteQuery + Routable + ToSchema,
+    T: Entity + Routable + ToSchema,
 {
     fn delete_endpoint_doc() -> OpenApi {
         let operation = Operation::builder()

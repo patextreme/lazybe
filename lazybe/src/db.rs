@@ -1,11 +1,11 @@
-use projection::CountResult;
-use sea_query::{Alias, Asterisk, Expr, QueryBuilder};
-use sqlx::{Database, Executor, FromRow, IntoArguments};
+use sea_query::QueryBuilder;
+use sqlx::{Database, Transaction};
 
+use crate::Entity;
+use crate::entity::ops::{CreateEntity, DeleteEntity, GetEntity, ListEntity, UpdateEntity};
 use crate::filter::Filter;
 use crate::page::{Page, PaginationInput};
 use crate::sort::Sort;
-use crate::{CreateQuery, DeleteQuery, Entity, GetQuery, ListQuery, UpdateQuery};
 
 pub trait DbCtx<Db> {
     type Qb: QueryBuilder + Default + Send;
@@ -54,203 +54,110 @@ pub trait DbOps<Db>
 where
     Db: Database,
 {
-    fn get<'e, T, E>(
+    fn get<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         id: <T as Entity>::Pk,
     ) -> impl Future<Output = Result<Option<T>, sqlx::Error>> + Send
     where
-        E: Executor<'e, Database = Db>,
-        T: GetQuery,
-        <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin;
+        T: GetEntity<Db>;
 
-    fn list<'e, T, E>(
+    fn list<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         filter: Filter<T>,
         sort: Sort<T>,
         pagination: Option<PaginationInput>,
     ) -> impl Future<Output = Result<Page<T>, sqlx::Error>> + Send
     where
-        E: Executor<'e, Database = Db> + Clone,
-        T: ListQuery,
-        <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
-        CountResult: for<'r> FromRow<'r, Db::Row> + Send + Unpin;
+        T: ListEntity<Db>;
 
-    fn create<'e, T, E>(
+    fn create<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         input: <T as Entity>::Create,
     ) -> impl Future<Output = Result<T, sqlx::Error>> + Send
     where
-        E: Executor<'e, Database = Db>,
-        T: CreateQuery,
-        <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin;
+        T: CreateEntity<Db>;
 
-    fn update<'e, T, E>(
+    fn update<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         id: <T as Entity>::Pk,
         input: <T as Entity>::Update,
     ) -> impl Future<Output = Result<Option<T>, sqlx::Error>> + Send
     where
-        E: Executor<'e, Database = Db>,
-        T: UpdateQuery,
-        <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin;
+        T: UpdateEntity<Db>;
 
-    fn delete<'e, T, E>(
+    fn delete<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         id: <T as Entity>::Pk,
     ) -> impl Future<Output = Result<(), sqlx::Error>> + Send
     where
-        T: DeleteQuery,
-        E: Executor<'e, Database = Db>;
+        T: DeleteEntity<Db>;
 }
 
 impl<Ctx, Db> DbOps<Db> for Ctx
 where
-    Ctx: DbCtx<Db>,
+    Ctx: DbCtx<Db> + Sync,
     Db: Database,
-    for<'q> <Db as Database>::Arguments<'q>: IntoArguments<'q, Db>,
 {
-    fn get<'e, T, E>(
+    fn get<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         id: <T as Entity>::Pk,
     ) -> impl Future<Output = Result<Option<T>, sqlx::Error>> + Send
     where
-        E: Executor<'e, Database = Db>,
-        T: GetQuery,
-        <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+        T: GetEntity<Db>,
     {
-        let query = <T as GetQuery>::get_query(id).to_string(self.query_buidler());
-        async move {
-            tracing::debug!("Executing query: {}", query);
-            let maybe_entity: Option<<T as Entity>::Row> = sqlx::query_as(&query).fetch_optional(executor).await?;
-            Ok(maybe_entity.map(|i| i.into()))
-        }
+        <T as GetEntity<Db>>::get(self, tx, id)
     }
 
-    fn list<'e, T, E>(
+    fn list<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         filter: Filter<T>,
         sort: Sort<T>,
         pagination: Option<PaginationInput>,
     ) -> impl Future<Output = Result<Page<T>, sqlx::Error>> + Send
     where
-        E: Executor<'e, Database = Db> + Clone,
-        T: ListQuery,
-        <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
-        CountResult: for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+        T: ListEntity<Db>,
     {
-        let mut base_query = <T as ListQuery>::list_query(filter);
-
-        // count
-        let count_query = {
-            let mut stm = base_query.clone();
-            stm.clear_selects()
-                .clear_order_by()
-                .expr_as(Expr::col(Asterisk).count(), Alias::new("count"));
-            stm.to_owned().to_string(self.query_buidler())
-        };
-
-        // data
-        let data_query = {
-            // sort
-            let order_by = sort.into_order_exprs();
-            base_query = base_query.order_by_columns(order_by).to_owned();
-
-            // filter
-            if let Some(p) = &pagination {
-                base_query = base_query.limit(p.limit.into()).offset(p.offset().into()).to_owned();
-            }
-            base_query.to_string(self.query_buidler())
-        };
-
-        async move {
-            tracing::debug!("Executing query: {}", data_query);
-            let data_result: Vec<<T as Entity>::Row> = sqlx::query_as(&data_query).fetch_all(executor.clone()).await?;
-
-            tracing::debug!("Executing query: {}", count_query);
-            let count_result: CountResult = sqlx::query_as(&count_query).fetch_one(executor).await?;
-
-            let mut page: u32 = 0;
-            let mut page_size: u64 = count_result.count.unsigned_abs();
-            if let Some(p) = pagination {
-                page = p.page;
-                page_size = p.limit.into();
-            }
-
-            let result = Page {
-                page,
-                page_size,
-                total_records: count_result.count.unsigned_abs(),
-                data: data_result.into_iter().map(|i| i.into()).collect(),
-            };
-            Ok(result)
-        }
+        <T as ListEntity<Db>>::list(self, tx, filter, sort, pagination)
     }
 
-    fn create<'e, T, E>(
+    fn create<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         input: <T as Entity>::Create,
     ) -> impl Future<Output = Result<T, sqlx::Error>> + Send
     where
-        E: Executor<'e, Database = Db>,
-        T: CreateQuery,
-        <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+        T: CreateEntity<Db>,
     {
-        let query = <T as CreateQuery>::create_query(input).to_string(self.query_buidler());
-        async move {
-            tracing::debug!("Executing query: {}", query);
-            let entity: <T as Entity>::Row = sqlx::query_as(&query).fetch_one(executor).await?;
-            Ok(entity.into())
-        }
+        <T as CreateEntity<Db>>::create(self, tx, input)
     }
 
-    fn update<'e, T, E>(
+    fn update<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         id: <T as Entity>::Pk,
         input: <T as Entity>::Update,
     ) -> impl Future<Output = Result<Option<T>, sqlx::Error>> + Send
     where
-        E: Executor<'e, Database = Db>,
-        T: UpdateQuery,
-        <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, Db::Row> + Send + Unpin,
+        T: UpdateEntity<Db>,
     {
-        let query = <T as UpdateQuery>::update_query(id, input).to_string(self.query_buidler());
-        async move {
-            tracing::debug!("Executing query: {}", query);
-            let maybe_entity: Option<<T as Entity>::Row> = sqlx::query_as(&query).fetch_optional(executor).await?;
-            Ok(maybe_entity.map(|i| i.into()))
-        }
+        <T as UpdateEntity<Db>>::update(self, tx, id, input)
     }
 
-    fn delete<'e, T, E>(
+    fn delete<T>(
         &self,
-        executor: E,
+        tx: &mut Transaction<'_, Db>,
         id: <T as Entity>::Pk,
     ) -> impl Future<Output = Result<(), sqlx::Error>> + Send
     where
-        T: DeleteQuery,
-        E: Executor<'e, Database = Db>,
+        T: DeleteEntity<Db>,
     {
-        let query = <T as DeleteQuery>::delete_query(id).to_string(self.query_buidler());
-        async move {
-            tracing::debug!("Executing query: {}", query);
-            sqlx::query(&query).execute(executor).await?;
-            Ok(())
-        }
-    }
-}
-
-mod projection {
-    #[derive(sqlx::FromRow)]
-    pub struct CountResult {
-        pub count: i64,
+        <T as DeleteEntity<Db>>::delete(self, tx, id)
     }
 }

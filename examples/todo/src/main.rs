@@ -1,12 +1,12 @@
 use entity::staff::Staff;
-use entity::todo::Todo;
+use entity::todo::{Todo, TodoBulkCreate};
 use lazybe::axum::Router;
 use lazybe::axum::extract::State;
 use lazybe::axum::http::StatusCode;
 use lazybe::axum::routing::get;
+use lazybe::db::sqlite::SqliteDbCtx;
 use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc, UpdateRouterDoc};
 use lazybe::router::{CreateRouter, DeleteRouter, GetRouter, ListRouter, RouteConfig, UpdateRouter};
-use lazybe::sqlite::SqliteDbCtx;
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 use utoipa::openapi::{Info, OpenApiBuilder, Server};
 use utoipa_swagger_ui::SwaggerUi;
@@ -43,6 +43,7 @@ async fn main() -> anyhow::Result<()> {
         .build();
 
     let endpoint_defs = [
+        (TodoBulkCreate::create_endpoint(), TodoBulkCreate::create_endpoint_doc()),
         (Todo::get_endpoint(), Todo::get_endpoint_doc()),
         (Todo::list_endpoint(), Todo::list_endpoint_doc()),
         (Todo::create_endpoint(), Todo::create_endpoint_doc()),
@@ -62,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let app_router = app
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", oas))
+        .merge(SwaggerUi::new("/").url("/api-docs/openapi.json", oas))
         .route("/_system/reset", get(reset_handler))
         .with_state(AppState { ctx, pool });
 
@@ -82,6 +83,7 @@ async fn reset_handler(State(state): State<AppState>) -> Result<(), StatusCode> 
 async fn reset_db(pool: &Pool<Sqlite>) -> anyhow::Result<()> {
     pool.execute(
         r#"
+DROP TABLE IF EXISTS todo_recur;
 DROP TABLE IF EXISTS todo;
 DROP TABLE IF EXISTS staff;
 
@@ -101,6 +103,14 @@ CREATE TABLE IF NOT EXISTS todo (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     FOREIGN KEY (assignee) REFERENCES staff(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS todo_recur (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    todo_id INTEGER NOT NULL,
+    interval TEXT NOT NULL,
+    max_occurance INTEGER,
+    FOREIGN KEY (todo_id) REFERENCES todo(id) ON DELETE RESTRICT
 );
         "#,
     )

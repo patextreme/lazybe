@@ -5,12 +5,13 @@ use serde::{Deserialize, Serialize};
 use sqlx::{Database, Pool};
 use uuid::Uuid;
 
+use crate::Entity;
+use crate::db::DbOps;
 use crate::filter::Filter;
 use crate::page::{Page, PaginationInput};
 use crate::sort::Sort;
-use crate::{DbOps, Entity};
 
-/// https://www.rfc-editor.org/rfc/rfc9457#name-type
+/// <https://www.rfc-editor.org/rfc/rfc9457#name-type>
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "oas", derive(utoipa::ToSchema))]
 pub struct ErrorResponse {
@@ -147,13 +148,14 @@ pub mod sqlite {
     use axum::{Json, Router};
     use serde::Serialize;
     use serde::de::DeserializeOwned;
-    use sqlx::{Database, FromRow};
 
     use super::{
         CreateRouter, DeleteRouter, EntityCollectionApi, ErrorResponse, GetRouter, ListRouter, ResultExt, Routable,
         RouteConfig, UpdateRouter, ValidationHook,
     };
-    use crate::{CreateQuery, DbOps, DeleteQuery, Entity, GetQuery, ListQuery, UpdateQuery};
+    use crate::Entity;
+    use crate::db::DbOps;
+    use crate::entity::ops::{CreateEntity, DeleteEntity, GetEntity, ListEntity, UpdateEntity};
 
     super::macros::axum_route_impl!(sqlx::Sqlite, crate::db::sqlite::SqliteDbCtx);
 }
@@ -166,13 +168,14 @@ pub mod postgres {
     use axum::{Json, Router};
     use serde::Serialize;
     use serde::de::DeserializeOwned;
-    use sqlx::{Database, FromRow};
 
     use super::{
         CreateRouter, DeleteRouter, EntityCollectionApi, ErrorResponse, GetRouter, ListRouter, ResultExt, Routable,
         RouteConfig, UpdateRouter, ValidationHook,
     };
-    use crate::{CreateQuery, DbOps, DeleteQuery, Entity, GetQuery, ListQuery, UpdateQuery};
+    use crate::Entity;
+    use crate::db::DbOps;
+    use crate::entity::ops::{CreateEntity, DeleteEntity, GetEntity, ListEntity, UpdateEntity};
 
     super::macros::axum_route_impl!(sqlx::Postgres, crate::db::postgres::PostgresDbCtx);
 }
@@ -185,10 +188,9 @@ mod macros {
 
             impl<T, S> GetRouter<S, DbImpl> for T
             where
-                T: GetQuery + Routable + Serialize + 'static,
+                T: GetEntity<DbImpl> + Routable + Serialize + Send + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as Entity>::Pk: DeserializeOwned + Send,
-                <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 fn get_endpoint() -> Router<S> {
                     let route = <T as Routable>::entity_path();
@@ -201,22 +203,23 @@ mod macros {
                 State(state): State<S>,
             ) -> Result<Json<T>, (StatusCode, Json<ErrorResponse>)>
             where
-                T: GetQuery + Routable + Serialize + 'static,
-                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                T: GetEntity<DbImpl> + Routable + Serialize + Send + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + 'static,
                 <T as Entity>::Pk: DeserializeOwned + Send,
-                <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 let (ctx, pool) = state.db_ctx();
+                let method = Method::GET;
                 let url = <T as Routable>::entity_path();
+                let mut tx = pool.begin().await.map_err_500::<T>(
+                    &method,
+                    url,
+                    "Failed to acquire a database transaction",
+                    None,
+                )?;
                 let result = ctx
-                    .get::<T, _>(&pool, id.clone())
+                    .get::<T>(&mut tx, id.clone())
                     .await
-                    .map_err_500::<T>(
-                        &Method::GET,
-                        url,
-                        "Failed to get an entity from database",
-                        Some(&id),
-                    )?
+                    .map_err_500::<T>(&method, url, "Failed to get an entity from database", Some(&id))?
                     .ok_or((
                         StatusCode::NOT_FOUND,
                         Json(
@@ -224,14 +227,16 @@ mod macros {
                                 .with_detail(&format!("An entity with id {:?} was not found.", id)),
                         ),
                     ))?;
+                tx.commit()
+                    .await
+                    .map_err_500::<T>(&method, url, "Failed to commit a transaction", None)?;
                 Ok(Json(result))
             }
 
             impl<T, S> ListRouter<S, DbImpl> for T
             where
-                T: ListQuery + EntityCollectionApi + Routable + Serialize + 'static,
+                T: ListEntity<DbImpl> + EntityCollectionApi + Routable + Serialize + Send + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
-                <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
                 <T as EntityCollectionApi>::Query: Send,
             {
                 fn list_endpoint() -> Router<S> {
@@ -245,31 +250,38 @@ mod macros {
                 Query(query): Query<<T as EntityCollectionApi>::Query>,
             ) -> Result<Json<<T as EntityCollectionApi>::Resp>, (StatusCode, Json<ErrorResponse>)>
             where
-                T: ListQuery + EntityCollectionApi + Routable + Serialize + 'static,
-                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
-                <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
+                T: ListEntity<DbImpl> + EntityCollectionApi + Routable + Serialize + Send + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + 'static,
                 <T as EntityCollectionApi>::Query: Send,
             {
                 let (ctx, pool) = state.db_ctx();
+                let method = Method::GET;
                 let url = <T as Routable>::entity_collection_path();
-
+                let mut tx = pool.begin().await.map_err_500::<T>(
+                    &method,
+                    url,
+                    "Failed to acquire a database transaction",
+                    None,
+                )?;
                 let page_input = <T as EntityCollectionApi>::page_input(&query);
                 let filter_input = <T as EntityCollectionApi>::filter_input(&query);
                 let sort_input = <T as EntityCollectionApi>::sort_input(&query);
                 let result = ctx
-                    .list::<T, _>(&pool, filter_input, sort_input, page_input)
+                    .list::<T>(&mut tx, filter_input, sort_input, page_input)
                     .await
                     .map_err_500::<T>(&Method::GET, url, "Failed to list entities from database", None)?;
+                tx.commit()
+                    .await
+                    .map_err_500::<T>(&method, url, "Failed to commit a transaction", None)?;
                 let page_resp = <T as EntityCollectionApi>::page_response(result);
                 Ok(Json(page_resp))
             }
 
             impl<T, S> CreateRouter<S, DbImpl> for T
             where
-                T: CreateQuery + ValidationHook + Routable + Serialize + DeserializeOwned + Send + Sync + 'static,
+                T: CreateEntity<DbImpl> + ValidationHook + Routable + Serialize + Send + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as Entity>::Create: DeserializeOwned + Send,
-                <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 fn create_endpoint() -> Router<S> {
                     let route = <T as Routable>::entity_collection_path();
@@ -282,10 +294,9 @@ mod macros {
                 Json(input): Json<<T as Entity>::Create>,
             ) -> Result<(StatusCode, Json<T>), (StatusCode, Json<ErrorResponse>)>
             where
-                T: CreateQuery + ValidationHook + Routable + Serialize + DeserializeOwned + Send + Sync + 'static,
+                T: CreateEntity<DbImpl> + ValidationHook + Routable + Serialize + Send + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as Entity>::Create: DeserializeOwned + Send,
-                <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 let (ctx, pool) = state.db_ctx();
                 let method = Method::POST;
@@ -298,7 +309,7 @@ mod macros {
                 )?;
 
                 <T as ValidationHook>::before_create(&input).map_err(|e| (StatusCode::BAD_REQUEST, Json(e)))?;
-                let result = ctx.create::<T, _>(&mut *tx, input).await.map_err_500::<T>(
+                let result = ctx.create::<T>(&mut tx, input).await.map_err_500::<T>(
                     &method,
                     url,
                     "Failed to create an entity in database",
@@ -314,7 +325,7 @@ mod macros {
 
             impl<T, S> DeleteRouter<S, DbImpl> for T
             where
-                T: DeleteQuery + Routable + Serialize + 'static,
+                T: DeleteEntity<DbImpl> + Routable + Serialize + Send + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as Entity>::Pk: DeserializeOwned + Send,
             {
@@ -329,29 +340,38 @@ mod macros {
                 State(state): State<S>,
             ) -> Result<Json<()>, (StatusCode, Json<ErrorResponse>)>
             where
-                T: DeleteQuery + Routable + Serialize + 'static,
-                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                T: DeleteEntity<DbImpl> + Routable + Serialize + Send + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + 'static,
                 <T as Entity>::Pk: DeserializeOwned + Send,
             {
                 let (ctx, pool) = state.db_ctx();
+                let method = Method::DELETE;
                 let url = <T as Routable>::entity_path();
-                ctx.delete::<T, _>(&pool, id.clone()).await.map_err_500::<T>(
-                    &Method::DELETE,
+                let mut tx = pool.begin().await.map_err_500::<T>(
+                    &method,
+                    url,
+                    "Failed to acquire a database transaction",
+                    None,
+                )?;
+                ctx.delete::<T>(&mut tx, id.clone()).await.map_err_500::<T>(
+                    &method,
                     url,
                     "Failed to delete an entity from database",
                     Some(&id),
                 )?;
+                tx.commit()
+                    .await
+                    .map_err_500::<T>(&method, url, "Failed to commit a transaction", None)?;
                 Ok(Json(()))
             }
 
             impl<T, S> UpdateRouter<S, DbImpl> for T
             where
-                T: UpdateQuery + ValidationHook + Routable + Serialize + Send + Sync + 'static,
+                T: UpdateEntity<DbImpl> + ValidationHook + Routable + Serialize + Send + 'static,
                 S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
                 <T as Entity>::Pk: DeserializeOwned + Send,
                 <T as Entity>::Update: DeserializeOwned + Send,
                 <T as Entity>::Replace: DeserializeOwned + Send,
-                <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
                 fn replace_endpoint() -> Router<S> {
                     let route = <T as Routable>::entity_path();
@@ -370,38 +390,12 @@ mod macros {
                 Json(input): Json<<T as Entity>::Update>,
             ) -> Result<Json<T>, (StatusCode, Json<ErrorResponse>)>
             where
-                T: UpdateQuery + ValidationHook + Routable + Serialize + Send + Sync + 'static,
-                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                T: UpdateEntity<DbImpl> + ValidationHook + Routable + Serialize + Send + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + 'static,
                 <T as Entity>::Pk: DeserializeOwned + Send,
                 <T as Entity>::Update: DeserializeOwned + Send,
-                <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
             {
-                let (ctx, pool) = state.db_ctx();
-                let method = Method::PATCH;
-                let url = <T as Routable>::entity_path();
-                let mut tx =
-                    pool.begin()
-                        .await
-                        .map_err_500::<T>(&method, url, "Failed to acquire a transaction", Some(&id))?;
-
-                <T as ValidationHook>::before_update(&id, &input).map_err(|e| (StatusCode::BAD_REQUEST, Json(e)))?;
-                let result = ctx
-                    .update::<T, _>(&mut *tx, id.clone(), input)
-                    .await
-                    .map_err_500::<T>(&method, url, "Failed to update an entity in database", Some(&id))?
-                    .ok_or((
-                        StatusCode::NOT_FOUND,
-                        Json(
-                            ErrorResponse::new("Not found")
-                                .with_detail(&format!("An entity with id {:?} was not found.", id)),
-                        ),
-                    ))?;
-                <T as ValidationHook>::after_update(&result).map_err(|e| (StatusCode::BAD_REQUEST, Json(e)))?;
-
-                tx.commit()
-                    .await
-                    .map_err_500::<T>(&method, url, "Failed to commit a transaction", Some(&id))?;
-                Ok(Json(result))
+                update_endpoint_logic(Method::PATCH, id, state, input).await
             }
 
             async fn replace_endpoint_impl<T, S>(
@@ -410,25 +404,37 @@ mod macros {
                 Json(input): Json<<T as Entity>::Replace>,
             ) -> Result<Json<T>, (StatusCode, Json<ErrorResponse>)>
             where
-                T: UpdateQuery + ValidationHook + Routable + Serialize + Send + Sync + 'static,
-                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + Sync + 'static,
+                T: UpdateEntity<DbImpl> + ValidationHook + Routable + Serialize + Send + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + 'static,
                 <T as Entity>::Pk: DeserializeOwned + Send,
-                <T as Entity>::Replace: DeserializeOwned + Send,
-                <T as Entity>::Row: Into<T> + for<'r> FromRow<'r, <DbImpl as Database>::Row> + Send + Unpin,
+                <T as Entity>::Replace: DeserializeOwned,
+                <T as Entity>::Update: Send,
+            {
+                update_endpoint_logic(Method::PUT, id, state, input.into()).await
+            }
+
+            async fn update_endpoint_logic<T, S>(
+                method: Method,
+                id: <T as Entity>::Pk,
+                state: S,
+                input: <T as Entity>::Update,
+            ) -> Result<Json<T>, (StatusCode, Json<ErrorResponse>)>
+            where
+                T: UpdateEntity<DbImpl> + ValidationHook + Routable + Serialize + Send + 'static,
+                S: RouteConfig<Ctx = CtxImpl, Db = DbImpl> + Clone + Send + 'static,
+                <T as Entity>::Pk: Send,
+                <T as Entity>::Update: Send,
             {
                 let (ctx, pool) = state.db_ctx();
-                let method = Method::PUT;
                 let url = <T as Routable>::entity_path();
-                let patch_input: <T as Entity>::Update = input.into();
                 let mut tx =
                     pool.begin()
                         .await
                         .map_err_500::<T>(&method, url, "Failed to acquire a transaction", Some(&id))?;
 
-                <T as ValidationHook>::before_update(&id, &patch_input)
-                    .map_err(|e| (StatusCode::BAD_REQUEST, Json(e)))?;
+                <T as ValidationHook>::before_update(&id, &input).map_err(|e| (StatusCode::BAD_REQUEST, Json(e)))?;
                 let result = ctx
-                    .update::<T, _>(&mut *tx, id.clone(), patch_input)
+                    .update::<T>(&mut tx, id.clone(), input)
                     .await
                     .map_err_500::<T>(&method, url, "Failed to update an entity in database", Some(&id))?
                     .ok_or((

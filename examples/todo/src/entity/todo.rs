@@ -1,20 +1,18 @@
-use lazybe::filter::Filter;
-use lazybe::macros::{Entity, Enum, Newtype};
-use lazybe::page::{Page, PaginationInput};
-use lazybe::router::EntityCollectionApi;
-use lazybe::sort::Sort;
+use lazybe::db::{DbCtx, DbOps};
+use lazybe::entity::ops::CreateEntity;
+use lazybe::macros::{Entity, EntityEndpoint, Enum, Newtype};
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::{DateTime, Utc};
+use sqlx::{Sqlite, Transaction};
 use utoipa::ToSchema;
 
-use super::Paginated;
 use super::staff::StaffId;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Newtype, ToSchema)]
 pub struct TodoId(u64);
 
 #[derive(Debug, Clone, Serialize, Deserialize, Entity, ToSchema)]
-#[lazybe(table = "todo", endpoint = "/todos", collection_api = "manual", derive_to_schema)]
+#[lazybe(table = "todo", endpoint = "/todos", derive_to_schema)]
 pub struct Todo {
     #[lazybe(primary_key)]
     pub id: TodoId,
@@ -35,41 +33,22 @@ pub enum Status {
     Done,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct TodoCollectionQuery {
-    pub status: Option<Status>,
-    pub assignee: Option<StaffId>,
-    pub page: Option<u32>,
-    pub size: Option<u32>,
+#[derive(Debug, Clone, Serialize, Deserialize, EntityEndpoint, ToSchema)]
+#[lazybe(endpoint = "/bulk/todos", create_ty = "Vec<CreateTodo>")]
+pub struct TodoBulkCreate {
+    todos: Vec<Todo>,
 }
 
-impl EntityCollectionApi for Todo {
-    type Resp = Paginated<Todo>;
-    type Query = TodoCollectionQuery;
-
-    fn page_response(page: Page<Self>) -> Self::Resp {
-        page.into()
-    }
-
-    fn page_input(input: &Self::Query) -> Option<PaginationInput> {
-        Some(PaginationInput {
-            page: input.page.map(|n| n.max(1) - 1).unwrap_or(0),
-            limit: input.size.unwrap_or(10).min(100),
-        })
-    }
-
-    fn filter_input(input: &Self::Query) -> Filter<Self> {
-        let mut conditions = Vec::new();
-        if let Some(status) = input.status.as_ref().cloned() {
-            conditions.push(TodoFilter::status().eq(status));
+impl CreateEntity<Sqlite> for TodoBulkCreate {
+    async fn create<Ctx>(ctx: &Ctx, tx: &mut Transaction<'_, Sqlite>, input: Self::Create) -> Result<Self, sqlx::Error>
+    where
+        Ctx: DbCtx<Sqlite> + Sync,
+    {
+        let mut todos = Vec::with_capacity(input.len());
+        for create_todo in input {
+            let todo = ctx.create::<Todo>(tx, create_todo).await?;
+            todos.push(todo);
         }
-        if let Some(assignee) = input.assignee.as_ref().cloned() {
-            conditions.push(TodoFilter::assignee().eq(assignee));
-        }
-        Filter::all(conditions)
-    }
-
-    fn sort_input(_input: &Self::Query) -> Sort<Self> {
-        Sort::new([TodoSort::id().asc()])
+        Ok(TodoBulkCreate { todos })
     }
 }
