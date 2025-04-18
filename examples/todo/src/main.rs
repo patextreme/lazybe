@@ -42,12 +42,12 @@ async fn main() -> anyhow::Result<()> {
         .build();
 
     let endpoint_defs = [
-        (Todo::get_endpoint(), Todo::get_endpoint_doc()),
-        (Todo::list_endpoint(), Todo::list_endpoint_doc()),
-        (Todo::create_endpoint(), Todo::create_endpoint_doc()),
-        (Todo::update_endpoint(), Todo::update_endpoint_doc()),
-        (Todo::replace_endpoint(), Todo::replace_endpoint_doc()),
-        (Todo::delete_endpoint(), Todo::delete_endpoint_doc()),
+        (Todo::get_endpoint(), Todo::get_endpoint_doc(None)),
+        (Todo::list_endpoint(), Todo::list_endpoint_doc(None)),
+        (Todo::create_endpoint(), Todo::create_endpoint_doc(None)),
+        (Todo::update_endpoint(), Todo::update_endpoint_doc(None)),
+        (Todo::replace_endpoint(), Todo::replace_endpoint_doc(None)),
+        (Todo::delete_endpoint(), Todo::delete_endpoint_doc(None)),
     ];
     for (endpoint_router, endpoint_doc) in endpoint_defs {
         app = app.merge(endpoint_router);
