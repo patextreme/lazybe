@@ -4,7 +4,7 @@
 cargo r -p example-todo
 ```
 
-API documentation is availble at `http://localhost:8080`
+API documentation is available at `http://localhost:8080`
 
 # Running tests
 
@@ -12,5 +12,5 @@ __Prerequisites__
 - [Hurl](https://hurl.dev/)
 
 ```bash
-hurl --variables-file hurl/env ./hurl/*.hurl --test --jobs 1
+hurl --variables-file hurl/.env ./hurl/*.hurl --test --jobs 1
 ```

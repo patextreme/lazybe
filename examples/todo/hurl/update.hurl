@@ -1,45 +1,52 @@
 GET {{ base_url }}/_system/reset
 HTTP 200
 
-POST {{ base_url }}/staffs
+POST {{ base_url }}/todos
 {
-  "name": "Alice"
+  "title": "Do homework",
+  "description": "due this week",
+  "status": "Todo"
 }
 HTTP 201
 [Captures]
-staff_id: jsonpath "$.id"
+task_id: jsonpath "$.id"
 
-GET {{ base_url }}/staffs/{{ staff_id }}
+GET {{ base_url }}/todos/{{ task_id }}
 HTTP 200
-[Asserts]
-jsonpath "$.name" == "Alice"
 [Captures]
 created_at: jsonpath "$.created_at"
 updated_at: jsonpath "$.updated_at"
 
-PATCH {{ base_url }}/staffs/{{ staff_id }}
+PATCH {{ base_url }}/todos/{{ task_id }}
 [Options]
 delay: 1s
 {
-  "name": "Bob"
+  "status": "Doing"
 }
 HTTP 200
 [Asserts]
-jsonpath "$.name" == "Bob"
+jsonpath "$.title" == "Do homework"
+jsonpath "$.description" == "due this week"
+jsonpath "$.status" == "Doing"
 jsonpath "$.created_at" == "{{ created_at }}"
 jsonpath "$.updated_at" != "{{ updated_at }}"
 [Captures]
 updated_at_2: jsonpath "$.updated_at"
 
-PATCH {{ base_url }}/staffs/{{ staff_id }}
+PUT {{ base_url }}/todos/{{ task_id }}
 [Options]
 delay: 1s
 {
-  "name": "Charlie"
+  "title": "Do math homework",
+  "description": null,
+  "status": "Done"
 }
 HTTP 200
 [Asserts]
-jsonpath "$.name" == "Charlie"
+jsonpath "$.title" == "Do math homework"
+jsonpath "$.description" == null
+jsonpath "$.status" == "Done"
 jsonpath "$.created_at" == "{{ created_at }}"
+jsonpath "$.updated_at" != "{{ updated_at }}"
 jsonpath "$.updated_at" != "{{ updated_at_2 }}"
 
