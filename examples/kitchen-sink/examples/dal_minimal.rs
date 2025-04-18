@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use lazybe::db::DbOps;
 use lazybe::db::sqlite::SqliteDbCtx;
 use lazybe::macros::Entity;
