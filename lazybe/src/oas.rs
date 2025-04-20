@@ -10,39 +10,46 @@ use crate::router::{EntityCollectionApi, ErrorResponse, Routable};
 const APPLICATION_JSON: &str = "application/json";
 
 pub trait GetRouterDoc {
-    fn get_endpoint_doc() -> OpenApi;
+    fn get_endpoint_doc(tag: Option<&str>) -> OpenApi;
 }
 
 pub trait ListRouterDoc {
-    fn list_endpoint_doc() -> OpenApi;
+    fn list_endpoint_doc(tag: Option<&str>) -> OpenApi;
 }
 
 pub trait CreateRouterDoc {
-    fn create_endpoint_doc() -> OpenApi;
+    fn create_endpoint_doc(tag: Option<&str>) -> OpenApi;
 }
 
 pub trait UpdateRouterDoc {
-    fn update_endpoint_doc() -> OpenApi;
-    fn replace_endpoint_doc() -> OpenApi;
+    fn update_endpoint_doc(tag: Option<&str>) -> OpenApi;
+    fn replace_endpoint_doc(tag: Option<&str>) -> OpenApi;
 }
 
 pub trait DeleteRouterDoc {
-    fn delete_endpoint_doc() -> OpenApi;
+    fn delete_endpoint_doc(tag: Option<&str>) -> OpenApi;
 }
 
 impl<T> GetRouterDoc for T
 where
     T: Entity + Routable + ToSchema,
 {
-    fn get_endpoint_doc() -> OpenApi {
-        let operation = Operation::builder()
-            .summary(Some(format!("Get {} entity by ID", <T as ToSchema>::name())))
-            .parameter(Parameter::new("id"))
-            .json_response::<T>(StatusCode::OK, "Entity retrieved successfully")
-            .error_response(StatusCode::BAD_REQUEST)
-            .error_response(StatusCode::NOT_FOUND)
-            .error_response(StatusCode::INTERNAL_SERVER_ERROR)
-            .build();
+    fn get_endpoint_doc(tag: Option<&str>) -> OpenApi {
+        let operation = {
+            let mut builder = Operation::builder()
+                .summary(Some(format!("Get {} by ID", <T as ToSchema>::name())))
+                .parameter(Parameter::new("id"))
+                .json_response::<T>(StatusCode::OK, "Entity retrieved successfully")
+                .error_response(StatusCode::BAD_REQUEST)
+                .error_response(StatusCode::NOT_FOUND)
+                .error_response(StatusCode::INTERNAL_SERVER_ERROR);
+
+            if let Some(tag) = tag {
+                builder = builder.tag(tag);
+            }
+
+            builder.build()
+        };
 
         let path = <T as Routable>::entity_path();
         let paths = Paths::builder()
@@ -65,14 +72,19 @@ where
     <T as EntityCollectionApi>::Resp: ToSchema,
     <T as EntityCollectionApi>::Query: ToSchema,
 {
-    fn list_endpoint_doc() -> OpenApi {
-        let operation = Operation::builder()
-            .summary(Some(format!("List {} entity", <T as ToSchema>::name())))
-            .query_object_param::<<T as EntityCollectionApi>::Query>()
-            .json_response::<<T as EntityCollectionApi>::Resp>(StatusCode::OK, "Entities retrieved successfully")
-            .error_response(StatusCode::BAD_REQUEST)
-            .error_response(StatusCode::INTERNAL_SERVER_ERROR)
-            .build();
+    fn list_endpoint_doc(tag: Option<&str>) -> OpenApi {
+        let operation = {
+            let mut builder = Operation::builder()
+                .summary(Some(format!("List {}", <T as ToSchema>::name())))
+                .query_object_param::<<T as EntityCollectionApi>::Query>()
+                .json_response::<<T as EntityCollectionApi>::Resp>(StatusCode::OK, "Entities retrieved successfully")
+                .error_response(StatusCode::BAD_REQUEST)
+                .error_response(StatusCode::INTERNAL_SERVER_ERROR);
+            if let Some(tag) = tag {
+                builder = builder.tag(tag);
+            }
+            builder.build()
+        };
 
         let path = <T as Routable>::entity_collection_path();
         let paths = Paths::builder()
@@ -98,14 +110,19 @@ where
     T: Entity + Routable + ToSchema,
     <T as Entity>::Create: ToSchema,
 {
-    fn create_endpoint_doc() -> OpenApi {
-        let operation = Operation::builder()
-            .summary(Some(format!("Create a new {}", <T as ToSchema>::name())))
-            .json_request::<<T as Entity>::Create>()
-            .json_response::<T>(StatusCode::CREATED, "Entity created successfully")
-            .error_response(StatusCode::BAD_REQUEST)
-            .error_response(StatusCode::INTERNAL_SERVER_ERROR)
-            .build();
+    fn create_endpoint_doc(tag: Option<&str>) -> OpenApi {
+        let operation = {
+            let mut builder = Operation::builder()
+                .summary(Some(format!("Create a new {}", <T as ToSchema>::name())))
+                .json_request::<<T as Entity>::Create>()
+                .json_response::<T>(StatusCode::CREATED, "Entity created successfully")
+                .error_response(StatusCode::BAD_REQUEST)
+                .error_response(StatusCode::INTERNAL_SERVER_ERROR);
+            if let Some(tag) = tag {
+                builder = builder.tag(tag);
+            }
+            builder.build()
+        };
 
         let path = <T as Routable>::entity_collection_path();
         let paths = Paths::builder()
@@ -128,19 +145,21 @@ where
     <T as Entity>::Update: ToSchema,
     <T as Entity>::Replace: ToSchema,
 {
-    fn update_endpoint_doc() -> OpenApi {
-        let operation = Operation::builder()
-            .summary(Some(format!(
-                "Parital update an existing {} entity",
-                <T as ToSchema>::name()
-            )))
-            .parameter(Parameter::new("id"))
-            .json_request::<<T as Entity>::Update>()
-            .json_response::<T>(StatusCode::OK, "Entity updated successfully")
-            .error_response(StatusCode::BAD_REQUEST)
-            .error_response(StatusCode::NOT_FOUND)
-            .error_response(StatusCode::INTERNAL_SERVER_ERROR)
-            .build();
+    fn update_endpoint_doc(tag: Option<&str>) -> OpenApi {
+        let operation = {
+            let mut builder = Operation::builder()
+                .summary(Some(format!("Partial update {}", <T as ToSchema>::name())))
+                .parameter(Parameter::new("id"))
+                .json_request::<<T as Entity>::Update>()
+                .json_response::<T>(StatusCode::OK, "Entity updated successfully")
+                .error_response(StatusCode::BAD_REQUEST)
+                .error_response(StatusCode::NOT_FOUND)
+                .error_response(StatusCode::INTERNAL_SERVER_ERROR);
+            if let Some(tag) = tag {
+                builder = builder.tag(tag);
+            }
+            builder.build()
+        };
 
         let path = <T as Routable>::entity_path();
         let paths = Paths::builder()
@@ -156,16 +175,21 @@ where
         OpenApiBuilder::new().paths(paths).components(Some(components)).build()
     }
 
-    fn replace_endpoint_doc() -> OpenApi {
-        let operation = Operation::builder()
-            .summary(Some(format!("Replace an existing {}", <T as ToSchema>::name())))
-            .parameter(Parameter::new("id"))
-            .json_request::<<T as Entity>::Replace>()
-            .json_response::<T>(StatusCode::OK, "Entity replaced successfully")
-            .error_response(StatusCode::BAD_REQUEST)
-            .error_response(StatusCode::NOT_FOUND)
-            .error_response(StatusCode::INTERNAL_SERVER_ERROR)
-            .build();
+    fn replace_endpoint_doc(tag: Option<&str>) -> OpenApi {
+        let operation = {
+            let mut builder = Operation::builder()
+                .summary(Some(format!("Replace {}", <T as ToSchema>::name())))
+                .parameter(Parameter::new("id"))
+                .json_request::<<T as Entity>::Replace>()
+                .json_response::<T>(StatusCode::OK, "Entity replaced successfully")
+                .error_response(StatusCode::BAD_REQUEST)
+                .error_response(StatusCode::NOT_FOUND)
+                .error_response(StatusCode::INTERNAL_SERVER_ERROR);
+            if let Some(tag) = tag {
+                builder = builder.tag(tag);
+            }
+            builder.build()
+        };
 
         let path = <T as Routable>::entity_path();
         let paths = Paths::builder()
@@ -186,14 +210,19 @@ impl<T> DeleteRouterDoc for T
 where
     T: Entity + Routable + ToSchema,
 {
-    fn delete_endpoint_doc() -> OpenApi {
-        let operation = Operation::builder()
-            .summary(Some(format!("Delete {} entity by ID", <T as ToSchema>::name())))
-            .parameter(Parameter::new("id"))
-            .response("200", Response::new("Entity deleted successfully"))
-            .error_response(StatusCode::BAD_REQUEST)
-            .error_response(StatusCode::INTERNAL_SERVER_ERROR)
-            .build();
+    fn delete_endpoint_doc(tag: Option<&str>) -> OpenApi {
+        let operation = {
+            let mut builder = Operation::builder()
+                .summary(Some(format!("Delete {} by ID", <T as ToSchema>::name())))
+                .parameter(Parameter::new("id"))
+                .response("200", Response::new("Entity deleted successfully"))
+                .error_response(StatusCode::BAD_REQUEST)
+                .error_response(StatusCode::INTERNAL_SERVER_ERROR);
+            if let Some(tag) = tag {
+                builder = builder.tag(tag);
+            }
+            builder.build()
+        };
 
         let path = <T as Routable>::entity_path();
         let paths = Paths::builder()

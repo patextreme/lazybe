@@ -1,5 +1,5 @@
 [package]
-name = "example-todo"
+name = "example-kitchen-sink"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

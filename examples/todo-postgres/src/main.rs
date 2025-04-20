@@ -2,10 +2,10 @@ use lazybe::axum::Router;
 use lazybe::axum::extract::State;
 use lazybe::axum::http::StatusCode;
 use lazybe::axum::routing::get;
-use lazybe::db::sqlite::SqliteDbCtx;
+use lazybe::db::postgres::PostgresDbCtx;
 use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc, UpdateRouterDoc};
 use lazybe::router::{CreateRouter, DeleteRouter, GetRouter, ListRouter, RouteConfig, UpdateRouter};
-use sqlx::{Executor, Pool, Sqlite, SqlitePool};
+use sqlx::{Executor, PgPool, Pool, Postgres};
 use todo::Todo;
 use utoipa::openapi::{Info, OpenApiBuilder, Server};
 use utoipa_redoc::{Redoc, Servable};
@@ -14,13 +14,13 @@ mod todo;
 
 #[derive(Clone)]
 struct AppState {
-    ctx: SqliteDbCtx,
-    pool: SqlitePool,
+    ctx: PostgresDbCtx,
+    pool: PgPool,
 }
 
 impl RouteConfig for AppState {
-    type Ctx = SqliteDbCtx;
-    type Db = Sqlite;
+    type Ctx = PostgresDbCtx;
+    type Db = Postgres;
 
     fn db_ctx(&self) -> (Self::Ctx, Pool<Self::Db>) {
         (self.ctx.clone(), self.pool.clone())
@@ -31,8 +31,8 @@ impl RouteConfig for AppState {
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let ctx = SqliteDbCtx;
-    let pool = SqlitePool::connect("sqlite::memory:").await?;
+    let ctx = PostgresDbCtx;
+    let pool = PgPool::connect("postgres://postgres:postgres@localhost:5432/postgres").await?;
     reset_db(&pool).await?;
 
     let mut app = Router::new();
@@ -72,18 +72,18 @@ async fn reset_handler(State(state): State<AppState>) -> Result<(), StatusCode> 
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
-async fn reset_db(pool: &SqlitePool) -> anyhow::Result<()> {
+async fn reset_db(pool: &PgPool) -> anyhow::Result<()> {
     pool.execute(
         r#"
 DROP TABLE IF EXISTS todo;
 
 CREATE TABLE IF NOT EXISTS todo (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id BIGSERIAL PRIMARY KEY,
     title TEXT NOT NULL,
     description TEXT,
     status TEXT NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
         "#,
     )

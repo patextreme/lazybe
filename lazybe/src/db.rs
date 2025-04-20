@@ -9,7 +9,7 @@ use crate::sort::Sort;
 
 pub trait DbCtx<Db> {
     type Qb: QueryBuilder + Default + Send;
-    fn query_buidler(&self) -> Self::Qb;
+    fn query_builder(&self) -> Self::Qb;
 }
 
 #[cfg(feature = "sqlite")]
@@ -25,7 +25,7 @@ pub mod sqlite {
     impl DbCtx<Sqlite> for SqliteDbCtx {
         type Qb = SqliteQueryBuilder;
 
-        fn query_buidler(&self) -> Self::Qb {
+        fn query_builder(&self) -> Self::Qb {
             SqliteQueryBuilder
         }
     }
@@ -44,7 +44,7 @@ pub mod postgres {
     impl DbCtx<Postgres> for PostgresDbCtx {
         type Qb = PostgresQueryBuilder;
 
-        fn query_buidler(&self) -> Self::Qb {
+        fn query_builder(&self) -> Self::Qb {
             PostgresQueryBuilder
         }
     }

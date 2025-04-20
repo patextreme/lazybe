@@ -184,6 +184,18 @@ where
             entity: PhantomData,
         }
     }
+
+    pub fn not_like<S>(self, like_stm: S) -> FilterExpr<Entity>
+    where
+        Col: LikeFilterable,
+        S: IntoLikeExpr,
+    {
+        let expr = self.col_expr.not_like(like_stm);
+        FilterExpr {
+            expr,
+            entity: PhantomData,
+        }
+    }
 }
 
 pub trait LikeFilterable {}

@@ -95,7 +95,7 @@ where
     where
         Ctx: DbCtx<Db> + Sync,
     {
-        let query = <T as GetQuery>::get_query(id).to_string(ctx.query_buidler());
+        let query = <T as GetQuery>::get_query(id).to_string(ctx.query_builder());
         async move {
             let maybe_entity: Option<<T as TableEntity>::Row> =
                 sqlx::query_as(&query).fetch_optional(tx.deref_mut()).await?;
@@ -131,7 +131,7 @@ where
             stm.clear_selects()
                 .clear_order_by()
                 .expr_as(Expr::col(Asterisk).count(), Alias::new("count"));
-            stm.to_owned().to_string(ctx.query_buidler())
+            stm.to_owned().to_string(ctx.query_builder())
         };
 
         // data
@@ -144,7 +144,7 @@ where
             if let Some(p) = &pagination {
                 base_query = base_query.limit(p.limit.into()).offset(p.offset().into()).to_owned();
             }
-            base_query.to_string(ctx.query_buidler())
+            base_query.to_string(ctx.query_builder())
         };
 
         async move {
@@ -187,7 +187,7 @@ where
     where
         Ctx: DbCtx<Db> + Sync,
     {
-        let query = <T as CreateQuery>::create_query(input).to_string(ctx.query_buidler());
+        let query = <T as CreateQuery>::create_query(input).to_string(ctx.query_builder());
         async move {
             let entity: <T as TableEntity>::Row = sqlx::query_as(&query).fetch_one(tx.deref_mut()).await?;
             Ok(entity.into())
@@ -212,7 +212,7 @@ where
     where
         Ctx: DbCtx<Db> + Sync,
     {
-        let query = <T as UpdateQuery>::update_query(id, input).to_string(ctx.query_buidler());
+        let query = <T as UpdateQuery>::update_query(id, input).to_string(ctx.query_builder());
         async move {
             let maybe_entity: Option<<T as TableEntity>::Row> =
                 sqlx::query_as(&query).fetch_optional(tx.deref_mut()).await?;
@@ -236,7 +236,7 @@ where
     where
         Ctx: DbCtx<Db> + Sync,
     {
-        let query = <T as DeleteQuery>::delete_query(id).to_string(ctx.query_buidler());
+        let query = <T as DeleteQuery>::delete_query(id).to_string(ctx.query_builder());
         async move {
             sqlx::query(&query).execute(tx.deref_mut()).await?;
             Ok(())

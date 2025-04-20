@@ -1,18 +1,18 @@
 [package]
-name = "example-todo"
+name = "example-todo-postgres"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-lazybe = { workspace = true, features = ["sqlite", "axum", "oas"] }
+lazybe = { workspace = true, features = ["postgres", "axum", "oas"] }
 sea-query = { workspace = true, features = ["with-chrono", "with-json"] }
 serde = { workspace = true }
 sqlx = { workspace = true, features = [
   "runtime-tokio",
   "chrono",
   "json",
-  "sqlite",
+  "postgres"
 ] }
 tracing = { workspace = true }
 
