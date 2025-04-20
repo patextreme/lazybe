@@ -3,9 +3,11 @@ use lazybe::axum::Router;
 use lazybe::db::sqlite::SqliteDbCtx;
 use lazybe::filter::Filter;
 use lazybe::macros::Entity;
-use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc};
+use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc, UpdateRouterDoc};
 use lazybe::page::{Page, PaginationInput};
-use lazybe::router::{CreateRouter, DeleteRouter, EntityCollectionApi, GetRouter, ListRouter, RouteConfig};
+use lazybe::router::{
+    CreateRouter, DeleteRouter, EntityCollectionApi, GetRouter, ListRouter, RouteConfig, UpdateRouter,
+};
 use lazybe::sort::Sort;
 use serde::{Deserialize, Serialize};
 use sqlx::{Executor, Sqlite, SqlitePool};
@@ -43,6 +45,8 @@ async fn main() -> anyhow::Result<()> {
         .merge_from(Book::get_endpoint_doc(None))
         .merge_from(Book::list_endpoint_doc(None))
         .merge_from(Book::create_endpoint_doc(None))
+        .merge_from(Book::update_endpoint_doc(None))
+        .merge_from(Book::replace_endpoint_doc(None))
         .merge_from(Book::delete_endpoint_doc(None));
 
     let app = Router::new()
@@ -50,6 +54,8 @@ async fn main() -> anyhow::Result<()> {
         .merge(Book::get_endpoint())
         .merge(Book::list_endpoint())
         .merge(Book::create_endpoint())
+        .merge(Book::update_endpoint())
+        .merge(Book::replace_endpoint())
         .merge(Book::delete_endpoint())
         .with_state(AppState { ctx, pool });
 
