@@ -20,7 +20,8 @@ fun parts where you do crazy stuff. LazyBE lets you skip the boring part and foc
   - See [validation example](./examples/kitchen-sink/examples/api_validation.rs)
 - Custom collection API (filter, sort, pagination)
   - See [collection API example](./examples/kitchen-sink/examples/api_pagination.rs)
-- JSON field using `#[lazybe(json)]`
+- JSON field
+  - See [json example](./examples/kitchen-sink/examples/dal_json.rs)
 
 ## A quick glance
 
