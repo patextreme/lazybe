@@ -1,31 +1,31 @@
 # Overview
 
-LazyBE (lazy backend) is a collection of building blocks to quickly build a backend CRUD application.
-It provides macros and trait impls that can be composed without having too much opinion on how to structure the application.
+LazyBE (Lazy Backend) is a collection of building blocks for quickly building a backend CRUD application.
+It provides macros and trait implementations that can be composed without being too opinionated about how to structure your application.
 
-A typical backend application usually have boring parts where you just need to do basic CRUD and
-fun parts where you do crazy stuff. LazyBE lets you skip the boring part and focus on the fun parts. 
+A typical backend application usually has boring parts, where you just need to do basic CRUD, and fun parts, where you get to do crazy stuff.
+LazyBE lets you skip the boring parts and focus on the fun ones.
 
 ## Features
 
-- Derive data access layer from a struct
-  - Using `sea-query` and `sqlx` under the hook which means you can use `postgres` and `sqlite` (no `mysql` just yet, but it should be trivial)
-  - Automatically timestamp `created_at` and `updated_at` timestamp
-  - See [dal example](./examples/kitchen-sink/examples/dal_minimal.rs)
-- Derive `axum` endpoint from a struct
-  - See [api example](./examples/kitchen-sink/examples/api_minimal.rs)
+- Derive the data access layer from a struct
+  - Uses `sea-query` and `sqlx` under the hood, which means you can use `Postgres` and `SQLite` (no `MySQL` support yet, but adding it should be trivial)
+  - Automatically handles `created_at` and `updated_at` timestamps
+  - See [minimal DAL example](./examples/kitchen-sink/examples/dal_minimal.rs)
+- Derive `axum` endpoints from a struct
+  - See [minimal API example](./examples/kitchen-sink/examples/api_minimal.rs)
 - Derive OpenAPI specification from a struct
-  - See [todo example](./examples/todo)
-- Custom validation
-  - See [validation example](./examples/kitchen-sink/examples/api_validation.rs)
-- Custom collection API (filter, sort, pagination)
-  - See [collection API example](./examples/kitchen-sink/examples/api_pagination.rs)
-- JSON field
-  - See [json example](./examples/kitchen-sink/examples/dal_json.rs)
+  - See [Todo example](./examples/todo)
+- Custom validation support
+  - See [Validation example](./examples/kitchen-sink/examples/api_validation.rs)
+- Custom collection API support (filter, sort, pagination)
+  - See [Collection API example](./examples/kitchen-sink/examples/api_pagination.rs)
+- Built-in support for JSON field
+  - See [JSON example](./examples/kitchen-sink/examples/dal_json.rs)
 
 ## A quick glance
 
-A quick glance of LazyBE look something like this
+Here’s a quick glance at what LazyBE looks like.
 
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize, Entity)]
@@ -43,21 +43,21 @@ pub struct Book {
 }
 ```
 
-The `Entity` macro derives traits and sibling types in order to implement commonly used backend layers.
+The `Entity` macro derives traits and sibling types to implement commonly used backend layers.
 
-- The attribute `table = "book"` defines a table to perform CRUD operations.
-- The optional attribute `endpoint = "/books"` defines a url path the resource should be exposed.
-- The optional attribute `derive_to_schema` make sure `utoipa::ToSchema` is derived for sibling types.
-- The attribute `#[lazybe(primary_key)]` defines a primary key so you can get the book by its ID.
-- The attribute `#[lazybe(created_at)]` and `#[lazybe(updated_at)]` automatically timestamp when an instance is created or updated.
+- The attribute `table = "book"` defines the database table used for CRUD operations.
+- The optional attribute `endpoint = "/books"` defines the URL path where the resource is exposed.
+- The optional attribute `derive_to_schema` ensures that `utoipa::ToSchema` is derived for sibling types.
+- The attribute `#[lazybe(primary_key)]` defines the primary key, allowing you to fetch a book by its ID.
+- The attributes `#[lazybe(created_at)]` and `#[lazybe(updated_at)]` automatically timestamp when a record is created or updated.
 
-With this macro, you have the following backend layers are implemented
+With this macro, the following backend layers are automatically implemented:
 
-1. Data access layer (`sqlx`, `sea-query`)
-2. API layer (`axum`, `serde`)
-3. OpenAPI specification (`utoipa`)
+1. Data access layer – using `sqlx` and `sea-query`
+2. API layer – using `axum` and `serde`
+3. OpenAPI specification – using `utoipa`
 
-Then, the `Book` can be exposed on REST API using `axum` like this
+You can then expose `Book` on a REST API using `axum` like this:
 
 ```rust
 #[tokio::main]
@@ -66,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
     let pool = SqlitePool::connect("sqlite::memory:").await?;
 
     let openapi = OpenApiBuilder::new()
-        .info(Info::new("Todo Example", "0.1.0"))
+        .info(Info::new("Example", "0.1.0"))
         .servers(Some([Server::new("http://localhost:8080")]))
         .build()
         .merge_from(Book::get_endpoint_doc(None))
@@ -93,21 +93,22 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
-This would create the following endpoints for `Book` resource
-- `POST /books` - Create a new book and save it in `book` table.
-- `GET /books` - Get a collection of books
-- `GET /books/{id}` - Get a book by its ID
-- `PUT /books/{id}` - Replace an existing book
-- `PATCH /books/{id}` - Partial update an existing book
-- `DELETE /books/{id}` - Delete a book by its ID
+This will generate the following endpoints for the `Book` resource:
 
-And also create OpenAPI specification for `Book` resource and serve it using Redoc UI.
+- `POST /books` – Create a new book and save it to the `book` table
+- `GET /books` – Retrieve a collection of books
+- `GET /books/{id}` – Retrieve a book by its ID
+- `PUT /books/{id}` – Replace an existing book
+- `PATCH /books/{id}` – Partially update an existing book
+- `DELETE /books/{id}` – Delete a book by its ID
+
+It will also generate the OpenAPI specification for the `Book` resource and serve it using the Redoc UI.
 
 ![](./docs/redoc.png)
 
-Of course this is a bit hand wavy, for a fully working example
-please check [minimal API example](./examples/kitchen-sink/examples/api_minimal.rs).
+This is just a high-level overview.
+For a complete working example, see the [minimal API example](./examples/kitchen-sink/examples/api_minimal.rs).
 
 # Documentation
 
-The only doc right now is the [example directory](./examples). There is no fancy doc site just yet.
+The only documentation for now is the [example directory](./examples). There’s no fancy doc site just yet.
