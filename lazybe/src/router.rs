@@ -265,12 +265,14 @@ impl<T, E: std::error::Error> ResultExt<T> for Result<T, E> {
 }
 
 #[cfg(feature = "sqlite")]
+#[doc(cfg(feature = "sqlite"))]
 pub mod sqlite {
     super::macros::axum_route_impl_imports!();
     super::macros::axum_route_impl!(sqlx::Sqlite, crate::db::sqlite::SqliteDbCtx);
 }
 
 #[cfg(feature = "postgres")]
+#[doc(cfg(feature = "postgres"))]
 pub mod postgres {
     super::macros::axum_route_impl_imports!();
     super::macros::axum_route_impl!(sqlx::Postgres, crate::db::postgres::PostgresDbCtx);

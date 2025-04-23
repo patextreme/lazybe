@@ -15,6 +15,7 @@ pub trait DbCtx<Db> {
 
 /// Integraion with sqlite database
 #[cfg(feature = "sqlite")]
+#[doc(cfg(feature = "sqlite"))]
 pub mod sqlite {
     use sea_query::SqliteQueryBuilder;
     use sqlx::Sqlite;
@@ -35,6 +36,7 @@ pub mod sqlite {
 
 /// Integraion with postgres database
 #[cfg(feature = "postgres")]
+#[doc(cfg(feature = "postgres"))]
 pub mod postgres {
     use sea_query::PostgresQueryBuilder;
     use sqlx::Postgres;

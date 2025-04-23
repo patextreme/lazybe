@@ -1,3 +1,5 @@
+#![feature(doc_cfg)]
+
 //! A building block for quickly (and lazily) creating CRUD backend applications.
 //!
 //! When building a backend application in Rust, you'll often need to expose resources
@@ -479,14 +481,17 @@ pub mod macros {
 
 /// Module implementing [`axum`] router
 #[cfg(feature = "axum")]
+#[doc(cfg(feature = "axum"))]
 pub mod router;
 
 /// Re-exports of [`axum`]
 #[cfg(feature = "axum")]
+#[doc(cfg(feature = "axum"))]
 pub mod axum {
     pub use axum::*;
 }
 
 /// Utilities for generating a OpenAPI documentation
 #[cfg(feature = "openapi")]
+#[doc(cfg(feature = "openapi"))]
 pub mod openapi;
