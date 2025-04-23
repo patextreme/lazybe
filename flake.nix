@@ -19,15 +19,44 @@
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
-        rust = pkgs.rust-bin.nightly."2025-03-24".default.override {
+        nightlyVersion = "2025-03-24";
+        rust = pkgs.rust-bin.nightly.${nightlyVersion}.default.override {
           extensions = [
             "rust-src"
             "rust-analyzer"
           ];
           targets = [ ];
         };
+        rustMinimal = pkgs.rust-bin.nightly.${nightlyVersion}.minimal;
+        rustPlatform = pkgs.makeRustPlatform {
+          cargo = rustMinimal;
+          rustc = rustMinimal;
+        };
       in
       {
+        checks = {
+          lazybe = rustPlatform.buildRustPackage {
+            name = "lazybe";
+            cargoLock.lockFile = ./Cargo.lock;
+            src = pkgs.lib.cleanSource ./.;
+            buildFeatures = [
+              "sqlite"
+              "postgres"
+              "axum"
+              "openapi"
+            ];
+          };
+
+          linter = pkgs.stdenv.mkDerivation {
+            name = "lazybe-linter";
+            src = ./.;
+            buildInputs = [ rust ];
+            doCheck = true;
+            checkPhase = "cargo fmt --check";
+            installPhase = "touch $out";
+          };
+        };
+
         devShells.default =
           let
             rootDir = "$ROOT_DIR";
@@ -78,6 +107,7 @@
                 which
                 # rust
                 cargo-expand
+                cargo-outdated
                 rust
               ])
               ++ (builtins.attrValues scripts);

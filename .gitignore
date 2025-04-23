@@ -4,4 +4,3 @@ target/
 *.pdb
 /target
 *.db
-Cargo.lock
