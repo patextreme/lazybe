@@ -98,6 +98,7 @@
                 # base
                 curl
                 git
+                git-cliff
                 hurl
                 jq
                 less
