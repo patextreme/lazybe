@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["examples/*", "lazybe", "lazybe-macro"]
+members = ["examples/*", "lazybe", "lazybe-macros"]
 
 [workspace.package]
 version = "0.1.0"

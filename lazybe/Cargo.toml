@@ -11,7 +11,7 @@ repository.workspace = true
 
 [dependencies]
 # core
-lazybe-macro = { path = "../lazybe-macro" }
+lazybe-macros = { path = "../lazybe-macros", version = "0.1.0" }
 tracing = { workspace = true }
 sea-query = { workspace = true }
 serde = { workspace = true }

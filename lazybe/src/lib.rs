@@ -474,7 +474,7 @@ pub mod uuid {
 
 /// Re-exports of proc-macro
 pub mod macros {
-    pub use lazybe_macro::*;
+    pub use lazybe_macros::*;
 }
 
 /// Module implementing [`axum`] router

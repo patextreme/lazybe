@@ -1,5 +1,5 @@
 [package]
-name = "lazybe-macro"
+name = "lazybe-macros"
 description = "Proc macro for lazybe crate"
 version.workspace = true
 edition.workspace = true
