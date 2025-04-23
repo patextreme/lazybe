@@ -3,7 +3,7 @@ use lazybe::axum::extract::State;
 use lazybe::axum::http::StatusCode;
 use lazybe::axum::routing::get;
 use lazybe::db::postgres::PostgresDbCtx;
-use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc, UpdateRouterDoc};
+use lazybe::openapi::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc, UpdateRouterDoc};
 use lazybe::router::{CreateRouter, DeleteRouter, GetRouter, ListRouter, RouteConfig, UpdateRouter};
 use sqlx::{Executor, PgPool, Pool, Postgres};
 use todo::Todo;

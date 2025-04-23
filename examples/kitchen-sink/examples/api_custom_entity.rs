@@ -4,7 +4,7 @@ use lazybe::db::sqlite::SqliteDbCtx;
 use lazybe::db::{DbCtx, DbOps};
 use lazybe::entity::ops::CreateEntity;
 use lazybe::macros::{Entity, EntityEndpoint};
-use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc};
+use lazybe::openapi::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc};
 use lazybe::router::{CreateRouter, DeleteRouter, GetRouter, ListRouter, RouteConfig};
 use serde::{Deserialize, Serialize};
 use sqlx::{Executor, Sqlite, SqlitePool};

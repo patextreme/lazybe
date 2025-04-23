@@ -7,25 +7,57 @@ mod entity_endpoint;
 mod r#enum;
 mod newtype;
 
-#[proc_macro_derive(Entity, attributes(lazybe))]
-pub fn derive_entity(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    entity::expand(input).into()
-}
-
-#[proc_macro_derive(Enum, attributes(lazybe))]
+#[proc_macro_derive(Enum)]
+/// Generate an enum encoder and decoder for database operation.
 pub fn derive_enum(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     r#enum::expand(input).into()
 }
 
 #[proc_macro_derive(Newtype)]
+/// Generate an newtype encoder and decoder for database operation.
 pub fn derive_newtype(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     newtype::expand(input).into()
 }
 
+#[proc_macro_derive(Entity, attributes(lazybe))]
+/// Generates building blocks for reading from and writing to the database, and exposes the entity via the API.
+///
+/// # Required attributes
+/// - `table = "..."` - The table to read from and write to.
+///
+/// # Optional attributes
+/// - `endpoint = "..."` - The base URL path for exposing HTTP API. (e.g. `endpoint = /books`)
+/// - `collection_api = "..."` - The collection API style for listing entities.
+///   - `list` - (default) Return a collection as a list without filtering, sorting, paging.
+///   - `manual` - Do not derive and manually provide the trait impl.
+/// - `validation = "..."` - The validation hook to run on entity modification via API.
+///    - `default` - (default) A no-op validation which always pass.
+///    - `manual` - Do not derive and manually provide the trait impl.
+/// - `derive_to_schema` - Derive `ToSchema` for all sibling types. This is useful for generating OpenAPI documeentation on generated types.
+pub fn derive_entity(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    entity::expand(input).into()
+}
+
 #[proc_macro_derive(EntityEndpoint, attributes(lazybe))]
+/// Generates building blocks for exposing entity via the API without directly map it to the database table.
+///
+/// # Required attributes
+/// - `endpoint = "..."` - The base URL path for exposing HTTP API. (e.g. `endpoint = /books`)
+///
+/// # Optional attributes
+/// - `collection_api = "..."` - The collection api style for listing entities.
+///   - `list` - (default) Return a collection as a list without filtering, sorting, paging.
+///   - `manual` - Do not derive and manually provide the trait impl.
+/// - `validation = "..."` - The validation hook to run on database modifications.
+///    - `default` - (default) A no-op validation which always pass.
+///    - `manual` - Do not derive and manually provide the trait impl.
+/// - `pk_ty = "..."` - Define the type of public key if applicable (e.g. `pk_ty = "i32"`)
+/// - `create_ty = "..."` - Define the type that can be use to create this custom entity type if applicable (e.g. `create_ty = "Vec<Book>"`)
+/// - `update_ty = "..."` - Define the type that can be use to update this custom entity type if applicable
+/// - `replace_ty = "..."` - Define the type that can be use to replace this custom entity type if applicable
 pub fn derive_entity_endpoint(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     entity_endpoint::expand(input).into()

@@ -28,7 +28,7 @@ LazyBE lets you skip the boring parts and focus on the fun ones.
 Here’s a quick glance at what LazyBE looks like.
 
 ```rust
-#[derive(Debug, Clone, Serialize, Deserialize, Entity)]
+#[derive(Debug, Clone, Serialize, Deserialize, Entity, ToSchema)]
 #[lazybe(table = "book", endpoint = "/books", derive_to_schema)]
 pub struct Book {
     #[lazybe(primary_key)]

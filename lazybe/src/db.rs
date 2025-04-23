@@ -7,11 +7,13 @@ use crate::filter::Filter;
 use crate::page::{Page, PaginationInput};
 use crate::sort::Sort;
 
+/// A context containing information about the target database.
 pub trait DbCtx<Db> {
     type Qb: QueryBuilder + Default + Send;
     fn query_builder(&self) -> Self::Qb;
 }
 
+/// Integraion with sqlite database
 #[cfg(feature = "sqlite")]
 pub mod sqlite {
     use sea_query::SqliteQueryBuilder;
@@ -31,6 +33,7 @@ pub mod sqlite {
     }
 }
 
+/// Integraion with postgres database
 #[cfg(feature = "postgres")]
 pub mod postgres {
     use sea_query::PostgresQueryBuilder;
@@ -50,6 +53,7 @@ pub mod postgres {
     }
 }
 
+/// Database operations
 pub trait DbOps<Db>
 where
     Db: Database,

@@ -17,9 +17,16 @@ uuid = { workspace = true, features = ["v4"] }
 axum = { workspace = true, optional = true }
 utoipa = { workspace = true, optional = true }
 
+[dev-dependencies]
+anyhow = { workspace = true }
+axum = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+serde_json = { workspace = true }
+
 [features]
 default = []
 sqlite = []
 postgres = []
 axum = ["dep:axum"]
-oas = ["axum", "dep:utoipa"]
+openapi = ["axum", "dep:utoipa"]

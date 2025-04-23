@@ -1,5 +1,5 @@
 use axum::http::{Method, StatusCode};
-pub use axum::*;
+use axum::{Json, Router};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use sqlx::{Database, Pool};
@@ -11,9 +11,10 @@ use crate::filter::Filter;
 use crate::page::{Page, PaginationInput};
 use crate::sort::Sort;
 
-/// <https://www.rfc-editor.org/rfc/rfc9457#name-type>
+/// A subset of properties outlined in
+/// <https://www.rfc-editor.org/rfc/rfc9457#name-members-of-a-problem-detail>
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "oas", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ErrorResponse {
     pub title: String,
     pub detail: Option<String>,
@@ -44,37 +45,159 @@ impl ErrorResponse {
     }
 }
 
+/// Defines how a collection API [`ListRouter`] behave
+///
+/// By default, the [`Entity`](crate::macros::Entity) macro generates a simple list collection API.
+/// The list collection API returns a simple list containing all records and does not support
+/// filtering, sorting or pagination.
+///
+/// # Example
+///
+/// You can also manually implement the [`EntityCollectionApi`], as different applications have
+/// their own conventions, pagination methods, or may require custom syntax to support
+/// sorting, filtering, and pagination logic.
+///
+/// ```
+/// # use lazybe::filter::Filter;
+/// # use lazybe::macros::Entity;
+/// # use lazybe::page::{Page, PaginationInput};
+/// # use lazybe::router::EntityCollectionApi;
+/// # use lazybe::sort::Sort;
+/// # use serde::{Deserialize, Serialize};
+/// #[derive(Serialize, Entity)]
+/// #[lazybe(table = "todo", endpoint = "/todos", collection_api = "manual")]
+/// pub struct Todo {
+///     #[lazybe(primary_key)]
+///     pub id: i32,
+///     pub title: String,
+///     pub description: Option<String>,
+///     pub is_completed: bool,
+/// }
+///
+/// #[derive(Deserialize)]
+/// pub struct TodoQuery {
+///     page: Option<u32>,
+///     completed: Option<bool>,
+/// }
+///
+/// impl EntityCollectionApi for Todo {
+///     type Resp = Vec<Todo>; // This could be a pagination result containing paging metadata
+///     type Query = TodoQuery;
+///
+///     fn page_response(page: Page<Self>) -> Self::Resp {
+///         page.data
+///     }
+///
+///     fn page_input(input: &Self::Query) -> Option<PaginationInput> {
+///         Some(PaginationInput {
+///             // API uses 1-index, lazybe uses 0-index
+///             page: input.page.map(|i| i.max(1)).unwrap_or(1) - 1,
+///             limit: 100,
+///         })
+///     }
+///
+///     fn filter_input(input: &Self::Query) -> Filter<Self> {
+///         // Apply filter only if provided explicitly in the query parameter
+///         match input.completed {
+///             Some(completed) => Filter::all([TodoFilter::is_completed().eq(completed)]),
+///             None => Filter::empty(),
+///         }
+///     }
+///
+///     fn sort_input(_input: &Self::Query) -> Sort<Self> {
+///         Sort::new([TodoSort::id().asc()])
+///     }
+/// }
+/// ```
 pub trait EntityCollectionApi: Sized {
+    /// A collection response. Possibly a list or paginated data with some metadata.
     type Resp: Serialize;
+
+    /// A shape of query parameter on a collection endpoint.
+    /// These params are used to define pagination, filtering, and sorting.
     type Query: DeserializeOwned;
 
+    /// Defines how a page should be translated into a collection response.
     fn page_response(page: Page<Self>) -> Self::Resp;
 
+    /// Construct a pagination input from query parameters.
+    /// Return `None` to list all records.
     fn page_input(input: &Self::Query) -> Option<PaginationInput>;
+
+    /// Construct collection filter from query parameters
     fn filter_input(input: &Self::Query) -> Filter<Self>;
+
+    /// Construct collection sorting from query parameters
     fn sort_input(input: &Self::Query) -> Sort<Self>;
 }
 
+/// A validation logic that gets called before and after database modifications.
+///
+/// When the validation returns error, the endpoint returns `400 BadRequest`
+/// and the database transaction is rolled back.
+///
+/// # Example
+///
+/// ```
+/// use chrono::{DateTime, Utc};
+/// use lazybe::macros::Entity;
+/// use lazybe::router::{ErrorResponse, ValidationHook};
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Entity)]
+/// #[lazybe(table = "todo", endpoint = "/todos", validation = "manual")]
+/// pub struct Todo {
+///     #[lazybe(primary_key)]
+///     pub id: i32,
+///     pub title: String,
+///     pub description: Option<String>,
+///     pub is_completed: bool,
+///     #[lazybe(created_at)]
+///     pub created_at: DateTime<Utc>,
+///     #[lazybe(updated_at)]
+///     pub updated_at: DateTime<Utc>,
+/// }
+///
+/// impl ValidationHook for Todo {
+///     fn before_create(input: &Self::Create) -> Result<(), ErrorResponse> {
+///         if input.title.len() > 100 {
+///             Err(ErrorResponse {
+///                 title: "Invalid todo title".to_string(),
+///                 detail: Some("Title cannot be longer than 100 characters".to_string()),
+///                 instance: None,
+///             })?
+///         }
+///         Ok(())
+///     }
+/// }
+/// ```
 pub trait ValidationHook: Entity {
-    fn before_create(_input: &Self::Create) -> Result<(), ErrorResponse> {
+    #[allow(unused_variables)]
+    fn before_create(input: &Self::Create) -> Result<(), ErrorResponse> {
         Ok(())
     }
 
-    fn after_create(_entity: &Self) -> Result<(), ErrorResponse> {
+    #[allow(unused_variables)]
+    fn after_create(entity: &Self) -> Result<(), ErrorResponse> {
         Ok(())
     }
 
-    fn before_update(_pk: &Self::Pk, _input: &Self::Update) -> Result<(), ErrorResponse> {
+    #[allow(unused_variables)]
+    fn before_update(pk: &Self::Pk, _input: &Self::Update) -> Result<(), ErrorResponse> {
         Ok(())
     }
 
-    fn after_update(_entity: &Self) -> Result<(), ErrorResponse> {
+    #[allow(unused_variables)]
+    fn after_update(entity: &Self) -> Result<(), ErrorResponse> {
         Ok(())
     }
 }
 
+/// Describes a URL path for an [`Entity`]
 pub trait Routable {
+    /// A URL path for an entity with its ID (e.g. `/books/{id}`)
     fn entity_path() -> &'static str;
+    /// A URL path for a collection of entity (e.g. `/books`)
     fn entity_collection_path() -> &'static str;
 }
 
@@ -99,6 +222,7 @@ pub trait DeleteRouter<S, Db> {
     fn delete_endpoint() -> Router<S>;
 }
 
+/// Describes how to extract a configuration from a shared [`axum`] state.
 pub trait RouteConfig {
     type Ctx: DbOps<Self::Db>;
     type Db: Database;
@@ -142,45 +266,36 @@ impl<T, E: std::error::Error> ResultExt<T> for Result<T, E> {
 
 #[cfg(feature = "sqlite")]
 pub mod sqlite {
-    use axum::extract::{Path, Query, State};
-    use axum::http::{Method, StatusCode};
-    use axum::routing::{delete, get, patch, post, put};
-    use axum::{Json, Router};
-    use serde::Serialize;
-    use serde::de::DeserializeOwned;
-
-    use super::{
-        CreateRouter, DeleteRouter, EntityCollectionApi, ErrorResponse, GetRouter, ListRouter, ResultExt, Routable,
-        RouteConfig, UpdateRouter, ValidationHook,
-    };
-    use crate::Entity;
-    use crate::db::DbOps;
-    use crate::entity::ops::{CreateEntity, DeleteEntity, GetEntity, ListEntity, UpdateEntity};
-
+    super::macros::axum_route_impl_imports!();
     super::macros::axum_route_impl!(sqlx::Sqlite, crate::db::sqlite::SqliteDbCtx);
 }
 
 #[cfg(feature = "postgres")]
 pub mod postgres {
-    use axum::extract::{Path, Query, State};
-    use axum::http::{Method, StatusCode};
-    use axum::routing::{delete, get, patch, post, put};
-    use axum::{Json, Router};
-    use serde::Serialize;
-    use serde::de::DeserializeOwned;
-
-    use super::{
-        CreateRouter, DeleteRouter, EntityCollectionApi, ErrorResponse, GetRouter, ListRouter, ResultExt, Routable,
-        RouteConfig, UpdateRouter, ValidationHook,
-    };
-    use crate::Entity;
-    use crate::db::DbOps;
-    use crate::entity::ops::{CreateEntity, DeleteEntity, GetEntity, ListEntity, UpdateEntity};
-
+    super::macros::axum_route_impl_imports!();
     super::macros::axum_route_impl!(sqlx::Postgres, crate::db::postgres::PostgresDbCtx);
 }
 
 mod macros {
+    macro_rules! axum_route_impl_imports {
+        () => {
+            use axum::extract::{Path, Query, State};
+            use axum::http::{Method, StatusCode};
+            use axum::routing::{delete, get, patch, post, put};
+            use axum::{Json, Router};
+            use serde::Serialize;
+            use serde::de::DeserializeOwned;
+
+            use super::{
+                CreateRouter, DeleteRouter, EntityCollectionApi, ErrorResponse, GetRouter, ListRouter, ResultExt,
+                Routable, RouteConfig, UpdateRouter, ValidationHook,
+            };
+            use crate::Entity;
+            use crate::db::DbOps;
+            use crate::entity::ops::{CreateEntity, DeleteEntity, GetEntity, ListEntity, UpdateEntity};
+        };
+    }
+
     macro_rules! axum_route_impl {
         ($db_ty:ty, $ctx_ty:ty) => {
             type DbImpl = $db_ty;
@@ -454,5 +569,5 @@ mod macros {
         };
     }
 
-    pub(super) use axum_route_impl;
+    pub(super) use {axum_route_impl, axum_route_impl_imports};
 }

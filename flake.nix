@@ -74,6 +74,7 @@
                 less
                 ncurses
                 pkg-config
+                watchexec
                 which
                 # rust
                 cargo-expand

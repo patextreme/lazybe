@@ -3,7 +3,7 @@ use lazybe::axum::Router;
 use lazybe::db::sqlite::SqliteDbCtx;
 use lazybe::filter::Filter;
 use lazybe::macros::Entity;
-use lazybe::oas::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc, UpdateRouterDoc};
+use lazybe::openapi::{CreateRouterDoc, DeleteRouterDoc, GetRouterDoc, ListRouterDoc, UpdateRouterDoc};
 use lazybe::page::{Page, PaginationInput};
 use lazybe::router::{
     CreateRouter, DeleteRouter, EntityCollectionApi, GetRouter, ListRouter, RouteConfig, UpdateRouter,
