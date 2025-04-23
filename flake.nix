@@ -57,6 +57,44 @@
           };
         };
 
+        apps = {
+          bump = {
+            type = "app";
+            program =
+              (pkgs.writeShellApplication {
+                name = "bump";
+                runtimeInputs = with pkgs; [
+                  git-cliff
+                  jq
+                  rust
+                  taplo
+                ];
+                text = ''
+                  NEW_VERSION=$(git-cliff --bump --context | jq -r .[0].version | sed s/^v//)
+                  NEW_VERSION_TAG="v$NEW_VERSION"
+
+                  echo "Preparing a new version: $NEW_VERSION (tag: $NEW_VERSION_TAG)"
+                  git-cliff --bump -o CHANGELOG.md
+                  sed -i -E "s/^version = .*\# bump$/version = \"$NEW_VERSION\" # bump/" Cargo.toml
+                  sed -i -E "s/^version = .*\# bump$/version = \"$NEW_VERSION\" # bump/" lazybe/Cargo.toml
+
+                  find . | grep '\.toml$' | xargs -I _ bash -c "echo running taplo on _ && taplo format _"
+
+                  cargo update lazybe-macros --precise "$NEW_VERSION"
+                  cargo update lazybe --precise "$NEW_VERSION"
+                  git add CHANGELOG.md
+                  git add Cargo.lock
+                  git add Cargo.toml
+                  git add lazybe/Cargo.toml
+
+                  printf "\nPlease verify if everything is ok, then run the following command ...\n"
+                  echo "> git commit -m \"chore(release): prepare for $NEW_VERSION release\""
+                '';
+              }).outPath
+              + "/bin/bump";
+          };
+        };
+
         devShells.default =
           let
             rootDir = "$ROOT_DIR";
@@ -98,6 +136,7 @@
                 # base
                 curl
                 git
+                git-cliff
                 hurl
                 jq
                 less

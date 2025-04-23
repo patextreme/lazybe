@@ -409,7 +409,7 @@ dependencies = [
 
 [[package]]
 name = "example-kitchen-sink"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -428,7 +428,7 @@ dependencies = [
 
 [[package]]
 name = "example-todo"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -447,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "example-todo-postgres"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -977,12 +977,12 @@ dependencies = [
 
 [[package]]
 name = "lazybe"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "axum",
  "chrono",
- "lazybe-macro",
+ "lazybe-macros",
  "sea-query",
  "serde",
  "serde_json",
@@ -994,8 +994,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "lazybe-macro"
-version = "0.1.0"
+name = "lazybe-macros"
+version = "0.1.1"
 dependencies = [
  "convert_case",
  "darling",

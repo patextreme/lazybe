@@ -3,6 +3,7 @@ name = "example-kitchen-sink"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
+publish = false
 
 [dependencies]
 anyhow = { workspace = true }

@@ -107,4 +107,16 @@ For a complete working example, see the [minimal API example](./examples/kitchen
 
 # Documentation
 
-The only documentation for now is the [example directory](./examples). There’s no fancy doc site just yet.
+- [Example directory](./examples)
+- [docs.rs](https://docs.rs/lazybe/latest/lazybe/)
+
+# Releasing
+
+```bash
+# Prepare a new version, then merge the PR and create a tag
+nix run .#bump
+
+# Publish to crates.io
+cargo publish -p lazybe-macros
+cargo publish -p lazybe
+```

@@ -1,11 +1,14 @@
 [workspace]
 resolver = "3"
-members = ["examples/*", "lazybe", "lazybe-macro"]
+members = ["examples/*", "lazybe", "lazybe-macros"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"                                       # bump
 edition = "2024"
 authors = ["Pat Losoponkul <pat.losoponkul@gmail.com>"]
+license = "Apache-2.0"
+homepage = "https://github.com/patextreme/lazybe"
+repository = "https://github.com/patextreme/lazybe"
 
 [workspace.dependencies]
 anyhow = "1"
