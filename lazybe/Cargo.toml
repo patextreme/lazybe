@@ -1,6 +1,6 @@
 [package]
 name = "lazybe"
-description = "Derive boring CRUD API boilerplate for Rust backend"
+description = "Derive boring CRUD boilerplate for Rust backend"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
