@@ -11,17 +11,13 @@ LazyBE lets you skip the boring parts and focus on the fun ones.
 - Derive the data access layer from a struct
   - Uses `sea-query` and `sqlx` under the hood, which means you can use `Postgres` and `SQLite` (no `MySQL` support yet, but adding it should be trivial)
   - Automatically handles `created_at` and `updated_at` timestamps
-  - See [minimal DAL example](./examples/kitchen-sink/examples/dal_minimal.rs)
-- Derive `axum` endpoints from a struct
-  - See [minimal API example](./examples/kitchen-sink/examples/api_minimal.rs)
-- Derive OpenAPI specification from a struct
-  - See [Todo example](./examples/todo)
-- Custom validation support
-  - See [Validation example](./examples/kitchen-sink/examples/api_validation.rs)
-- Custom collection API support (filter, sort, pagination)
-  - See [Collection API example](./examples/kitchen-sink/examples/api_pagination.rs)
-- Built-in support for JSON field
-  - See [JSON example](./examples/kitchen-sink/examples/dal_json.rs)
+  - See [Minimal DAL example](./examples/kitchen-sink/examples/dal_minimal.rs)
+- Derive `axum` endpoints from a struct (See [Minimal API example](./examples/kitchen-sink/examples/api_minimal.rs))
+- Derive OpenAPI specification from a struct (See [Todo example](./examples/todo))
+- Custom validation support (See [Validation example](./examples/kitchen-sink/examples/api_validation.rs))
+- Custom ID generation (See [Custom ID example](./examples/kitchen-sink/examples/dal_custom_id.rs))
+- Custom collection API support filter, sort, pagination (See [Collection API example](./examples/kitchen-sink/examples/api_pagination.rs))
+- Built-in support for JSON field (See [JSON example](./examples/kitchen-sink/examples/dal_json.rs))
 
 ## A quick glance
 

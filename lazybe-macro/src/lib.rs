@@ -24,10 +24,10 @@ pub fn derive_newtype(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Entity, attributes(lazybe))]
 /// Generates building blocks for reading from and writing to the database, and exposes the entity via the API.
 ///
-/// # Required attributes
+/// # Required struct attributes
 /// - `table = "..."` - The table to read from and write to.
 ///
-/// # Optional attributes
+/// # Optional struct attributes
 /// - `endpoint = "..."` - The base URL path for exposing HTTP API. (e.g. `endpoint = /books`)
 /// - `collection_api = "..."` - The collection API style for listing entities.
 ///   - `list` - (default) Return a collection as a list without filtering, sorting, paging.
@@ -36,6 +36,13 @@ pub fn derive_newtype(input: TokenStream) -> TokenStream {
 ///    - `default` - (default) A no-op validation which always pass.
 ///    - `manual` - Do not derive and manually provide the trait impl.
 /// - `derive_to_schema` - Derive `ToSchema` for all sibling types. This is useful for generating OpenAPI documeentation on generated types.
+///
+/// # Field attributes
+/// - `primary_key` - Specify the field to be used as primary key.
+/// - `generate_with = "..."` - A function use for generating an ID. If omitted, ID should be generate by the database.
+/// - `created_at` - Speicify the field for created_at timestamp. The time is stamped once a record is created.
+/// - `updated_at` - Speicify the field for updated_at timestamp. The time is stamped once a record is updated.
+/// - `json` - The field should be encoded as JSON column.
 pub fn derive_entity(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     entity::expand(input).into()

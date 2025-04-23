@@ -310,12 +310,38 @@
 //! # Advanced Usage
 //!
 //!
+//! ## Validation
+//! See [`ValidationHook`](router::ValidationHook)
+//!
+//!
 //! ## Custom collection API
 //! See [`EntityCollectionApi`](router::EntityCollectionApi)
 //!
 //!
-//! ## Validation
-//! See [`ValidationHook`](router::ValidationHook)
+//! ## Custom ID generation
+//!
+//! The field that serves as the primary key is usually generated from the database.
+//! If you need control over how the ID is generated, you can use the `generate_with` attribute to
+//! specify the function used for ID generation. This function accepts the reference to [`Entity::Create`] type.
+//!
+//! ```
+//! use lazybe::macros::Entity;
+//! use lazybe::uuid::Uuid;
+//!
+//! #[derive(Entity)]
+//! #[lazybe(table = "todo")]
+//! pub struct Todo {
+//!     #[lazybe(primary_key, generate_with = "uuid_string")]
+//!     pub id: String,
+//!     pub title: String,
+//!     pub description: Option<String>,
+//!     pub is_completed: bool,
+//! }
+//!
+//! fn uuid_string(_: &CreateTodo) -> String {
+//!     Uuid::new_v4().to_string()
+//! }
+//! ```
 //!
 //!
 //! ## Nested types

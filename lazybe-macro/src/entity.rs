@@ -26,6 +26,8 @@ struct EntityFieldAttr {
     #[darling(default)]
     primary_key: bool,
     #[darling(default)]
+    generate_with: Option<String>,
+    #[darling(default)]
     created_at: bool,
     #[darling(default)]
     updated_at: bool,
@@ -453,6 +455,29 @@ fn create_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
         .as_ref()
         .map(|_| quote! { now.into() })
         .into_iter();
+    let pk_ident_pascal = entity_meta
+        .primary_key
+        .attr
+        .generate_with
+        .as_ref()
+        .map(|_| {
+            let pk_ident = &entity_meta.primary_key.ident_pascal;
+            quote! { #sea_query_ident::#pk_ident }
+        })
+        .into_iter();
+    let pk_value = entity_meta
+        .primary_key
+        .attr
+        .generate_with
+        .as_ref()
+        .map(|f| {
+            let f_ident = format_ident!("{}", f);
+            quote! {
+                (#f_ident(&input).into())
+            }
+        })
+        .into_iter();
+
     quote! {
         impl lazybe::query::CreateQuery for #entity {
             fn create_query(input: Self::Create) -> sea_query::InsertStatement {
@@ -460,11 +485,13 @@ fn create_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
                 sea_query::Query::insert()
                     .into_table(#sea_query_ident::Table)
                     .columns([
+                        #(#pk_ident_pascal,)*
                         #(#sea_query_ident::#user_defined_fields_ident_pascal,)*
                         #(#created_at_ident_pascal,)*
                         #(#updated_at_ident_pascal,)*
                     ])
                    .values_panic([
+                       #(#pk_value,)*
                         #(#user_defined_fields_value,)*
                         #(#created_at_value,)*
                         #(#updated_at_value,)*
