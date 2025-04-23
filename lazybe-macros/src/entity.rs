@@ -172,22 +172,15 @@ fn expand_struct(input: &DeriveInput, data_struct: &DataStruct) -> syn::Result<T
     match &data_struct.fields {
         Fields::Named(fields_named) => {
             let entity_meta = EntityMeta::try_parse(input, fields_named)?;
-            let entity_types_impl = entity_types_impl(&entity_meta);
-            let entity_row_impl = entity_row_impl(&entity_meta);
-            let entity_entity_trait_impl = entity_entity_trait_impl(&entity_meta);
-            let entity_query_trait_impl = entity_query_trait_impl(&entity_meta);
-            let entity_route_trait_impl = entity_route_trait_impl(&entity_meta);
-            let entity_collection_api_trait_impl = entity_collection_api_trait_impl(&entity_meta);
-            let entity_validation_hook_trait_impl = entity_validation_hook_trait_impl(&entity_meta);
-            Ok(quote! {
-                #entity_types_impl
-                #entity_row_impl
-                #entity_entity_trait_impl
-                #entity_query_trait_impl
-                #entity_route_trait_impl
-                #entity_collection_api_trait_impl
-                #entity_validation_hook_trait_impl
-            })
+            let mut ts = TokenStream::new();
+            ts.extend(entity_types_impl(&entity_meta));
+            ts.extend(entity_row_impl(&entity_meta));
+            ts.extend(entity_entity_trait_impl(&entity_meta));
+            ts.extend(entity_query_trait_impl(&entity_meta));
+            ts.extend(entity_route_trait_impl(&entity_meta));
+            ts.extend(entity_collection_api_trait_impl(&entity_meta));
+            ts.extend(entity_validation_hook_trait_impl(&entity_meta));
+            Ok(ts)
         }
         Fields::Unnamed(_) => Err(syn::Error::new_spanned(
             &input.ident,
@@ -401,18 +394,13 @@ fn entity_entity_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
 }
 
 fn entity_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
-    let get_query_trait_impl = get_query_trait_impl(entity_meta);
-    let list_query_trait_impl = list_query_trait_impl(entity_meta);
-    let create_query_trait_impl = create_query_trait_impl(entity_meta);
-    let update_query_trait_impl = update_query_trait_impl(entity_meta);
-    let delete_query_trait_impl = delete_query_trait_impl(entity_meta);
-    quote! {
-        #get_query_trait_impl
-        #list_query_trait_impl
-        #create_query_trait_impl
-        #update_query_trait_impl
-        #delete_query_trait_impl
-    }
+    let mut ts = TokenStream::new();
+    ts.extend(get_query_trait_impl(entity_meta));
+    ts.extend(list_query_trait_impl(entity_meta));
+    ts.extend(create_query_trait_impl(entity_meta));
+    ts.extend(update_query_trait_impl(entity_meta));
+    ts.extend(delete_query_trait_impl(entity_meta));
+    ts
 }
 
 fn create_query_trait_impl(entity_meta: &EntityMeta) -> TokenStream {
