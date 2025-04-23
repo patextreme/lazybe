@@ -6,6 +6,8 @@ members = ["examples/*", "lazybe", "lazybe-macro"]
 version = "0.1.0"
 edition = "2024"
 authors = ["Pat Losoponkul <pat.losoponkul@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/patextreme/lazybe"
 
 [workspace.dependencies]
 anyhow = "1"
