@@ -78,6 +78,7 @@
                 which
                 # rust
                 cargo-expand
+                cargo-outdated
                 rust
               ])
               ++ (builtins.attrValues scripts);
