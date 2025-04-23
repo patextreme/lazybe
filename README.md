@@ -107,4 +107,5 @@ For a complete working example, see the [minimal API example](./examples/kitchen
 
 # Documentation
 
-The only documentation for now is the [example directory](./examples). There’s no fancy doc site just yet.
+- [Example directory](./examples)
+- [docs.rs](https://docs.rs/lazybe/latest/lazybe/)
