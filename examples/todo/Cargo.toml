@@ -3,6 +3,7 @@ name = "example-todo"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
+publish = false
 
 [dependencies]
 anyhow = { workspace = true }

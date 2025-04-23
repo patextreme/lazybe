@@ -1,8 +1,13 @@
 [package]
 name = "lazybe-macro"
+description = "Proc macro for lazybe crate"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
+license.workspace = true
+readme = "../README.md"
+homepage.workspace = true
+repository.workspace = true
 
 [lib]
 proc-macro = true
