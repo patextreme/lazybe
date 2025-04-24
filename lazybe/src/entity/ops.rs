@@ -153,8 +153,12 @@ where
 
             let count_result: CountResult = sqlx::query_as(&count_query).fetch_one(tx.deref_mut()).await?;
 
+            let total_records: u32 = count_result
+                .count
+                .try_into()
+                .expect("record count does not fit in u32");
             let mut page: u32 = 0;
-            let mut page_size: u64 = count_result.count.unsigned_abs();
+            let mut page_size: u32 = total_records;
             if let Some(p) = pagination {
                 page = p.page;
                 page_size = p.limit.into();
@@ -163,7 +167,7 @@ where
             let result = Page {
                 page,
                 page_size,
-                total_records: count_result.count.unsigned_abs(),
+                total_records,
                 data: data_result.into_iter().map(|i| i.into()).collect(),
             };
             Ok(result)
