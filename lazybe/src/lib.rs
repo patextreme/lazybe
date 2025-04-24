@@ -7,7 +7,7 @@
 //! Much of this work tends to be boilerplate, with little domain logic or custom code.
 //!
 //! If you are already using:
-//! - [`axum`] for HTTP interface
+//! - [`axum`](::axum) for HTTP interface
 //! - [`sqlx`] for database interactions
 //! - [`utoipa`] for OpenAPI docuementation
 //!

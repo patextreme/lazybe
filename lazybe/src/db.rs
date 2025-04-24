@@ -13,7 +13,7 @@ pub trait DbCtx<Db> {
     fn query_builder(&self) -> Self::Qb;
 }
 
-/// Integraion with sqlite database
+/// Integration with sqlite database
 #[cfg(feature = "sqlite")]
 #[doc(cfg(feature = "sqlite"))]
 pub mod sqlite {
@@ -34,7 +34,7 @@ pub mod sqlite {
     }
 }
 
-/// Integraion with postgres database
+/// Integration with postgres database
 #[cfg(feature = "postgres")]
 #[doc(cfg(feature = "postgres"))]
 pub mod postgres {

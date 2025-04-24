@@ -78,8 +78,8 @@ pub struct Book {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaginatedBook {
     pub page: u32,
-    pub page_size: u64,
-    pub count: u64,
+    pub page_size: u32,
+    pub count: u32,
     pub data: Vec<Book>,
 }
 
