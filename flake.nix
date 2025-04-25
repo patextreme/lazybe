@@ -27,33 +27,25 @@
           ];
           targets = [ ];
         };
-        rustMinimal = pkgs.rust-bin.nightly.${nightlyVersion}.minimal;
         rustPlatform = pkgs.makeRustPlatform {
-          cargo = rustMinimal;
-          rustc = rustMinimal;
+          cargo = rust;
+          rustc = rust;
         };
       in
       {
         checks = {
           lazybe = rustPlatform.buildRustPackage {
-            name = "lazybe";
+            name = "lazybe-checks";
             cargoLock.lockFile = ./Cargo.lock;
             src = pkgs.lib.cleanSource ./.;
-            buildFeatures = [
-              "sqlite"
-              "postgres"
-              "axum"
-              "openapi"
-            ];
-          };
-
-          linter = pkgs.stdenv.mkDerivation {
-            name = "lazybe-linter";
-            src = ./.;
-            buildInputs = [ rust ];
-            doCheck = true;
-            checkPhase = "cargo fmt --check";
+            dontBuild = true;
             installPhase = "touch $out";
+            checkPhase = ''
+              cargo fmt --check
+              cargo clippy --all-features --all-targets -- -D warnings
+              cargo b --all-features --all-targets
+              cargo test --all-features
+            '';
           };
         };
 
