@@ -158,7 +158,7 @@ where
             let mut page_size: u32 = total_records;
             if let Some(p) = pagination {
                 page = p.page;
-                page_size = p.limit.into();
+                page_size = p.limit;
             }
 
             let result = Page {
