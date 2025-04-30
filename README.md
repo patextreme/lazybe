@@ -113,8 +113,8 @@ For a complete working example, see the [minimal API example](./examples/kitchen
 # Releasing
 
 ```bash
-# Prepare a new version, then merge the PR and create a tag
-nix run .#bump
+# Prepare a new version, then commit and create a tag
+nix run .#bump-version
 
 # Publish to crates.io
 cargo publish -p lazybe-macros

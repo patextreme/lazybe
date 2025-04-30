@@ -38,23 +38,22 @@
             name = "lazybe-checks";
             cargoLock.lockFile = ./Cargo.lock;
             src = pkgs.lib.cleanSource ./.;
-            dontBuild = true;
-            installPhase = "touch $out";
+            buildPhase = "cargo b --all-features --all-targets";
             checkPhase = ''
               cargo fmt --check
               cargo clippy --all-features --all-targets -- -D warnings
-              cargo b --all-features --all-targets
               cargo test --all-features
             '';
+            installPhase = "touch $out";
           };
         };
 
         apps = {
-          bump = {
+          bump-version = {
             type = "app";
             program =
               (pkgs.writeShellApplication {
-                name = "bump";
+                name = "bump-version";
                 runtimeInputs = with pkgs; [
                   git-cliff
                   jq
@@ -83,7 +82,7 @@
                   echo "> git commit -m \"chore(release): prepare for $NEW_VERSION release\""
                 '';
               }).outPath
-              + "/bin/bump";
+              + "/bin/bump-version";
           };
         };
 
