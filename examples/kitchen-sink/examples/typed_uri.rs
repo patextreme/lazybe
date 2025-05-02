@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 struct QueryParam {
-    repetition: usize,
+    repetition: Option<usize>,
 }
 
 typed_uri!(Hello, "hello");
@@ -33,8 +33,8 @@ async fn hello() -> &'static str {
     "hello world"
 }
 
-async fn echo(Path(path): Path<Echo>, Query(q): Query<QueryParam>) -> String {
-    std::iter::repeat_n(path.word.as_str(), q.repetition)
+async fn echo(Path(path): Path<Echo>, Query(query): Query<QueryParam>) -> String {
+    std::iter::repeat_n(path.word.as_str(), query.repetition.unwrap_or(1))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -43,7 +43,7 @@ async fn echo2(Path(path): Path<Echo2>) -> Redirect {
     let uri = Echo::new_uri(
         path.word,
         QueryParam {
-            repetition: path.repetition,
+            repetition: Some(path.repetition),
         },
     );
     Redirect::temporary(&uri)

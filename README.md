@@ -18,6 +18,7 @@ LazyBE lets you skip the boring parts and focus on the fun ones.
 - Custom ID generation (See [Custom ID example](./examples/kitchen-sink/examples/dal_custom_id.rs))
 - Custom collection API support filter, sort, pagination (See [Collection API example](./examples/kitchen-sink/examples/api_pagination.rs))
 - Built-in support for JSON field (See [JSON example](./examples/kitchen-sink/examples/dal_json.rs))
+- Type-safe URI (See [Typed URI example](./examples/kitchen-sink/examples/typed_uri.rs))
 
 ## A quick glance
 

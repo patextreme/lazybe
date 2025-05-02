@@ -72,6 +72,7 @@ pub fn derive_entity_endpoint(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
+/// Generate a URI builder method and a struct for path extractor.
 pub fn typed_uri(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as typed_uri::TypedUriMeta);
     typed_uri::expand(input).into()

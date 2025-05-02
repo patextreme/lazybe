@@ -309,6 +309,46 @@
 //! - [`openapi`] module
 //!
 //!
+//! ## Typed URI
+//!
+//! Defining and linking multiple endpoints can feel brittle, especially
+//! when managing redirects or referencing other URIs.
+//! Updating a URI in one place but forgetting to update it elsewhere is a common issue.
+//! The [`typed_uri`](macros::typed_uri) macro addresses this by generating consistent,
+//! type-safe code for both defining Axum endpoints and constructing URI instances.
+//!
+//! ```
+//! use axum::Router;
+//! use axum::extract::{Path, Query};
+//! use axum::routing::get;
+//! use lazybe::macros::typed_uri;
+//! use serde::{Deserialize, Serialize};
+//!
+//! #[derive(Serialize, Deserialize)]
+//! struct BookQuery {
+//!     price_currency: Option<String>,
+//! }
+//!
+//! typed_uri!(Book, "api" / "books" / (book_id: u32) ? Option<BookQuery>);
+//! typed_uri!(BookRevision, "api" / "books" / (book_id: u32) / "revisions" / (revision: u16));
+//!
+//! fn main() {
+//!     let router: Router = Router::new()
+//!         .route(Book::AXUM_PATH, get(book))
+//!         .route(BookRevision::AXUM_PATH, get(book_revision));
+//! }
+//!
+//! async fn book(Path(path): Path<Book>, Query(query): Query<BookQuery>) -> String {
+//!     format!("Getting book id: {}", path.book_id)
+//! }
+//!
+//! async fn book_revision(Path(path): Path<BookRevision>) -> String {
+//!     let uri = BookRevision::new_uri(path.book_id, path.revision + 1);
+//!     format!("The next revision for this book can be found at {}", uri)
+//! }
+//! ```
+//!
+//!
 //! # Advanced Usage
 //!
 //!
