@@ -78,7 +78,7 @@ pub fn expand(uri_meta: TypedUriMeta) -> TokenStream {
     let mut ts = TokenStream::new();
     ts.extend(expand_uri_struct(&uri_meta));
     ts.extend(expand_axum_url(&uri_meta));
-    ts.extend(expand_new_url(&uri_meta));
+    ts.extend(expand_new_uri(&uri_meta));
     ts
 }
 
@@ -117,7 +117,7 @@ fn expand_axum_url(uri_meta: &TypedUriMeta) -> TokenStream {
     }
 }
 
-fn expand_new_url(uri_meta: &TypedUriMeta) -> TokenStream {
+fn expand_new_uri(uri_meta: &TypedUriMeta) -> TokenStream {
     let ident = &uri_meta.ident;
     let fn_args = uri_meta
         .dynamic_segments()
@@ -150,7 +150,8 @@ fn expand_new_url(uri_meta: &TypedUriMeta) -> TokenStream {
 
     quote! {
         impl #ident {
-            pub fn new_url(#(#fn_args),*) -> String {
+            /// Construct a relative URI from path segements and query params
+            pub fn new_uri(#(#fn_args),*) -> String {
                 let base_url = format!(
                     concat!(#(#str_segments),*),
                     #(#fmt_args),*
