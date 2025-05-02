@@ -33,12 +33,12 @@ impl Parse for PathSegment {
     }
 }
 
-pub struct TypedUrlMeta {
+pub struct TypedUriMeta {
     ident: Ident,
     path_segments: Vec<PathSegment>,
 }
 
-impl TypedUrlMeta {
+impl TypedUriMeta {
     fn dynamic_segments(&self) -> Vec<(Ident, Box<Type>)> {
         self.path_segments
             .iter()
@@ -50,29 +50,45 @@ impl TypedUrlMeta {
     }
 }
 
-impl Parse for TypedUrlMeta {
+impl Parse for TypedUriMeta {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let ident = input.parse()?;
         let _: Token![,] = input.parse()?;
         let path_segments = Punctuated::<PathSegment, Token![/]>::parse_separated_nonempty(input)?
             .into_iter()
             .collect();
-        Ok(TypedUrlMeta { ident, path_segments })
+        Ok(TypedUriMeta { ident, path_segments })
     }
 }
 
-pub fn expand(url_meta: TypedUrlMeta) -> TokenStream {
+pub fn expand(uri_meta: TypedUriMeta) -> TokenStream {
     let mut ts = TokenStream::new();
-    let ident = &url_meta.ident;
-    ts.extend(quote! { pub struct #ident; });
-    ts.extend(expand_axum_url(&url_meta));
-    ts.extend(expand_new_url(&url_meta));
+    ts.extend(expand_uri_struct(&uri_meta));
+    ts.extend(expand_axum_url(&uri_meta));
+    ts.extend(expand_new_url(&uri_meta));
     ts
 }
 
-fn expand_axum_url(url_meta: &TypedUrlMeta) -> TokenStream {
-    let ident = &url_meta.ident;
-    let str_segments = url_meta
+fn expand_uri_struct(uri_meta: &TypedUriMeta) -> TokenStream {
+    let ident = &uri_meta.ident;
+    let dyn_segments = uri_meta.dynamic_segments();
+
+    if dyn_segments.is_empty() {
+        quote! { pub struct #ident; }
+    } else {
+        let defs = dyn_segments.into_iter().map(|(ident, ty)| quote! { pub #ident: #ty });
+        quote! {
+            #[derive(serde::Deserialize)]
+            pub struct #ident {
+                #(#defs),*
+            }
+        }
+    }
+}
+
+fn expand_axum_url(uri_meta: &TypedUriMeta) -> TokenStream {
+    let ident = &uri_meta.ident;
+    let str_segments = uri_meta
         .path_segments
         .iter()
         .map(|i| match i {
@@ -83,22 +99,22 @@ fn expand_axum_url(url_meta: &TypedUrlMeta) -> TokenStream {
 
     quote! {
         impl #ident {
-            const AXUM_URL: &str = concat!(#(#str_segments),*);
+            const AXUM_PATH: &str = concat!(#(#str_segments),*);
         }
     }
 }
 
-fn expand_new_url(url_meta: &TypedUrlMeta) -> TokenStream {
-    let ident = &url_meta.ident;
-    let fn_args = url_meta
+fn expand_new_url(uri_meta: &TypedUriMeta) -> TokenStream {
+    let ident = &uri_meta.ident;
+    let fn_args = uri_meta
         .dynamic_segments()
         .into_iter()
         .map(|(ident, ty)| quote! { #ident: #ty });
-    let fmt_args = url_meta
+    let fmt_args = uri_meta
         .dynamic_segments()
         .into_iter()
         .map(|(ident, _)| quote! { #ident });
-    let str_segments = url_meta
+    let str_segments = uri_meta
         .path_segments
         .iter()
         .map(|i| match i {
