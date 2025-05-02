@@ -80,6 +80,6 @@ fn query_param_uri() {
             author: Some("writer&friends".to_string()),
             year_published: Some(2000)
         })),
-        "api/books?author=writer%26friends&year_published=2000"
+        "/api/books?author=writer%26friends&year_published=2000"
     );
 }

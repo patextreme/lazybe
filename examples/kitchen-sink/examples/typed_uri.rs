@@ -42,7 +42,7 @@ async fn echo(Path(path): Path<Echo>, Query(q): Query<QueryParam>) -> String {
 async fn echo2(Path(path): Path<Echo2>) -> Redirect {
     let uri = Echo::new_uri(
         path.word,
-        &QueryParam {
+        QueryParam {
             repetition: path.repetition,
         },
     );
