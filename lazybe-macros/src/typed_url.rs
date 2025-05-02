@@ -1,5 +1,5 @@
 use proc_macro2::{Ident, TokenStream};
-use quote::{TokenStreamExt, quote};
+use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::token::Paren;
@@ -7,7 +7,7 @@ use syn::{LitStr, Token, Type};
 
 pub enum PathSegment {
     Static(LitStr),
-    Dynamic { ident: Ident, ty: Type },
+    Dynamic { ident: Ident, ty: Box<Type> },
 }
 
 impl Parse for PathSegment {
@@ -21,8 +21,9 @@ impl Parse for PathSegment {
             let content;
             syn::parenthesized!(content in input);
             let ident: Ident = content.parse()?;
+            let _: Token![:] = content.parse()?;
             let ty: Type = content.parse()?;
-            return Ok(Self::Dynamic { ident, ty });
+            return Ok(Self::Dynamic { ident, ty: ty.into() });
         }
 
         Err(syn::Error::new(
@@ -53,26 +54,53 @@ pub fn expand(url_meta: TypedUrlMeta) -> TokenStream {
     let ident = &url_meta.ident;
     ts.extend(quote! { pub struct #ident; });
     ts.extend(expand_axum_url(&url_meta));
+    ts.extend(expand_new_url(&url_meta));
     ts
 }
 
-pub fn expand_axum_url(url_meta: &TypedUrlMeta) -> TokenStream {
+fn expand_axum_url(url_meta: &TypedUrlMeta) -> TokenStream {
     let ident = &url_meta.ident;
-    let axum_path = "/".to_string()
-        + &url_meta
-            .path_segments
-            .iter()
-            .map(|i| match i {
-                PathSegment::Static(lit_str) => lit_str.value(),
-                PathSegment::Dynamic { ident, .. } => format!("{{{}}}", ident.to_string()),
-            })
-            .collect::<Vec<_>>()
-            .join("/");
+    let str_segments = url_meta
+        .path_segments
+        .iter()
+        .map(|i| match i {
+            PathSegment::Static(lit_str) => lit_str.value(),
+            PathSegment::Dynamic { ident, .. } => format!("{{{}}}", ident),
+        })
+        .map(|i| format!("/{}", i));
 
     quote! {
         impl #ident {
-            fn axum_url() -> &'static str {
-                #axum_path
+            const AXUM_URL: &str = concat!(#(#str_segments),*);
+        }
+    }
+}
+
+fn expand_new_url(url_meta: &TypedUrlMeta) -> TokenStream {
+    let ident = &url_meta.ident;
+    let fn_args = url_meta.path_segments.iter().filter_map(|i| match i {
+        PathSegment::Dynamic { ident, ty } => Some(quote! { #ident: #ty }),
+        _ => None,
+    });
+    let fmt_args = url_meta.path_segments.iter().filter_map(|i| match i {
+        PathSegment::Dynamic { ident, .. } => Some(quote! { #ident }),
+        _ => None,
+    });
+    let str_segments = url_meta
+        .path_segments
+        .iter()
+        .map(|i| match i {
+            PathSegment::Static(lit_str) => lit_str.value(),
+            PathSegment::Dynamic { .. } => "{}".to_string(),
+        })
+        .map(|i| format!("/{}", i));
+    quote! {
+        impl #ident {
+            pub fn new_url(#(#fn_args),*) -> String {
+                format!(
+                    concat!(#(#str_segments),*),
+                    #(#fmt_args),*
+                )
             }
         }
     }
