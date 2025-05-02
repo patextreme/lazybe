@@ -6,6 +6,7 @@ mod entity;
 mod entity_endpoint;
 mod r#enum;
 mod newtype;
+mod typed_url;
 
 #[proc_macro_derive(Enum)]
 /// Generate an enum encoder and decoder for database operation.
@@ -68,4 +69,10 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 pub fn derive_entity_endpoint(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     entity_endpoint::expand(input).into()
+}
+
+#[proc_macro]
+pub fn typed_url(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as typed_url::TypedUrlMeta);
+    typed_url::expand(input).into()
 }

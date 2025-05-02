@@ -469,6 +469,12 @@ pub mod query;
 /// Utilities for sorting records
 pub mod sort;
 
+pub mod url {
+    pub fn to_query_string<T: serde::Serialize>(query: &T) -> Result<String, serde_qs::Error> {
+        serde_qs::to_string::<T>(query)
+    }
+}
+
 /// Re-exports of [`uuid`]
 pub mod uuid {
     pub use uuid::*;

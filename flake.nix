@@ -42,6 +42,7 @@
             checkPhase = ''
               cargo fmt --check
               cargo clippy --all-features --all-targets -- -D warnings
+              cargo test -p lazybe --all-features
               cargo test --all-features
             '';
             installPhase = "touch $out";
