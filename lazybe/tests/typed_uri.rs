@@ -1,4 +1,5 @@
 use lazybe_macros::typed_uri;
+use serde::{Deserialize, Serialize};
 
 #[test]
 fn static_uri() {
@@ -40,4 +41,45 @@ fn dynamic_uri() {
     typed_uri!(MovieEpisode, "api" / "movies" / (movie_id: u32) / (episode: u8));
     assert_eq!(MovieEpisode::AXUM_PATH, "/api/movies/{movie_id}/{episode}");
     assert_eq!(MovieEpisode::new_uri(123, 2), "/api/movies/123/2");
+}
+
+#[test]
+fn query_param_uri() {
+    #[derive(Deserialize, Serialize)]
+    struct BookQuery {
+        author: Option<String>,
+        year_published: Option<u16>,
+    }
+
+    typed_uri!(Book, "api" / "books" ? Option<BookQuery>);
+    assert_eq!(Book::AXUM_PATH, "/api/books");
+    assert_eq!(Book::new_uri(None), "/api/books");
+    assert_eq!(
+        Book::new_uri(Some(BookQuery {
+            author: None,
+            year_published: None
+        })),
+        "/api/books"
+    );
+    assert_eq!(
+        Book::new_uri(Some(BookQuery {
+            author: Some("writer&friends".to_string()),
+            year_published: None
+        })),
+        "/api/books?author=writer%26friends"
+    );
+    assert_eq!(
+        Book::new_uri(Some(BookQuery {
+            author: None,
+            year_published: Some(2000)
+        })),
+        "/api/books?year_published=2000"
+    );
+    assert_eq!(
+        Book::new_uri(Some(BookQuery {
+            author: Some("writer&friends".to_string()),
+            year_published: Some(2000)
+        })),
+        "api/books?author=writer%26friends&year_published=2000"
+    );
 }

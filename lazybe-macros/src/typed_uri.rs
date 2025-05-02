@@ -123,7 +123,7 @@ fn expand_new_uri(uri_meta: &TypedUriMeta) -> TokenStream {
         .dynamic_segments()
         .into_iter()
         .map(|(ident, ty)| quote! { #ident: #ty })
-        .chain(uri_meta.query_param.as_ref().map(|ty| quote! { query: &#ty }));
+        .chain(uri_meta.query_param.as_ref().map(|ty| quote! { query: #ty }));
     let fmt_args = uri_meta
         .dynamic_segments()
         .into_iter()
@@ -139,10 +139,12 @@ fn expand_new_uri(uri_meta: &TypedUriMeta) -> TokenStream {
 
     let full_url_block = if uri_meta.query_param.is_some() {
         quote! {
-            base_url + "?"
-                + &lazybe::uri::to_query_string(query).expect(
-                    &format!("Unable to serialize {} to query parameter", stringify!(#ident))
-                )
+            let query_str = lazybe::uri::to_query_string(&query).expect(&format!("Unable to serialize {} to query parameter", stringify!(#ident)));
+            if query_str.is_empty() {
+                base_url
+            } else {
+                base_url + "?" + &query_str
+            }
         }
     } else {
         quote! { base_url }
