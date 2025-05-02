@@ -36,6 +36,7 @@ impl Parse for PathSegment {
 pub struct TypedUriMeta {
     ident: Ident,
     path_segments: Vec<PathSegment>,
+    query_param: Option<Type>,
 }
 
 impl TypedUriMeta {
@@ -57,7 +58,19 @@ impl Parse for TypedUriMeta {
         let path_segments = Punctuated::<PathSegment, Token![/]>::parse_separated_nonempty(input)?
             .into_iter()
             .collect();
-        Ok(TypedUriMeta { ident, path_segments })
+
+        let mut query_param = None;
+        if input.peek(Token![?]) {
+            let _: Token![?] = input.parse()?;
+            let ty: Type = input.parse()?;
+            query_param = Some(ty);
+        }
+
+        Ok(TypedUriMeta {
+            ident,
+            path_segments,
+            query_param,
+        })
     }
 }
 
@@ -109,7 +122,8 @@ fn expand_new_url(uri_meta: &TypedUriMeta) -> TokenStream {
     let fn_args = uri_meta
         .dynamic_segments()
         .into_iter()
-        .map(|(ident, ty)| quote! { #ident: #ty });
+        .map(|(ident, ty)| quote! { #ident: #ty })
+        .chain(uri_meta.query_param.as_ref().map(|ty| quote! { query: &#ty }));
     let fmt_args = uri_meta
         .dynamic_segments()
         .into_iter()
@@ -122,13 +136,26 @@ fn expand_new_url(uri_meta: &TypedUriMeta) -> TokenStream {
             PathSegment::Dynamic { .. } => "{}".to_string(),
         })
         .map(|i| format!("/{}", i));
+
+    let full_url_block = if uri_meta.query_param.is_some() {
+        quote! {
+            base_url + "?"
+                + &lazybe::uri::to_query_string(query).expect(
+                    &format!("Unable to serialize {} to query parameter", stringify!(#ident))
+                )
+        }
+    } else {
+        quote! { base_url }
+    };
+
     quote! {
         impl #ident {
             pub fn new_url(#(#fn_args),*) -> String {
-                format!(
+                let base_url = format!(
                     concat!(#(#str_segments),*),
                     #(#fmt_args),*
-                )
+                );
+                #full_url_block
             }
         }
     }

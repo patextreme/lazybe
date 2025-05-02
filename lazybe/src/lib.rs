@@ -469,7 +469,9 @@ pub mod query;
 /// Utilities for sorting records
 pub mod sort;
 
-pub mod url {
+/// Utilities for working with URIs
+pub mod uri {
+    /// Serialize a struct to query parameters
     pub fn to_query_string<T: serde::Serialize>(query: &T) -> Result<String, serde_qs::Error> {
         serde_qs::to_string::<T>(query)
     }
