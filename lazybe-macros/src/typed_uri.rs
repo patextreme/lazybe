@@ -112,7 +112,7 @@ fn expand_axum_url(uri_meta: &TypedUriMeta) -> TokenStream {
 
     quote! {
         impl #ident {
-            const AXUM_PATH: &str = concat!(#(#str_segments),*);
+            pub const AXUM_PATH: &str = concat!(#(#str_segments),*);
         }
     }
 }
