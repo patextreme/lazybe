@@ -6,6 +6,7 @@ mod entity;
 mod entity_endpoint;
 mod r#enum;
 mod newtype;
+mod typed_uri;
 
 #[proc_macro_derive(Enum)]
 /// Generate an enum encoder and decoder for database operation.
@@ -68,4 +69,11 @@ pub fn derive_entity(input: TokenStream) -> TokenStream {
 pub fn derive_entity_endpoint(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     entity_endpoint::expand(input).into()
+}
+
+#[proc_macro]
+/// Generate a URI builder method and a struct for path extractor.
+pub fn typed_uri(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as typed_uri::TypedUriMeta);
+    typed_uri::expand(input).into()
 }
