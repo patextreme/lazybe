@@ -38,6 +38,18 @@ pub struct TypedUrlMeta {
     path_segments: Vec<PathSegment>,
 }
 
+impl TypedUrlMeta {
+    fn dynamic_segments(&self) -> Vec<(Ident, Box<Type>)> {
+        self.path_segments
+            .iter()
+            .filter_map(|i| match i {
+                PathSegment::Dynamic { ident, ty } => Some((ident.clone(), ty.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
 impl Parse for TypedUrlMeta {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let ident = input.parse()?;
@@ -78,14 +90,14 @@ fn expand_axum_url(url_meta: &TypedUrlMeta) -> TokenStream {
 
 fn expand_new_url(url_meta: &TypedUrlMeta) -> TokenStream {
     let ident = &url_meta.ident;
-    let fn_args = url_meta.path_segments.iter().filter_map(|i| match i {
-        PathSegment::Dynamic { ident, ty } => Some(quote! { #ident: #ty }),
-        _ => None,
-    });
-    let fmt_args = url_meta.path_segments.iter().filter_map(|i| match i {
-        PathSegment::Dynamic { ident, .. } => Some(quote! { #ident }),
-        _ => None,
-    });
+    let fn_args = url_meta
+        .dynamic_segments()
+        .into_iter()
+        .map(|(ident, ty)| quote! { #ident: #ty });
+    let fmt_args = url_meta
+        .dynamic_segments()
+        .into_iter()
+        .map(|(ident, _)| quote! { #ident });
     let str_segments = url_meta
         .path_segments
         .iter()
