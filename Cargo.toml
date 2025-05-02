@@ -3,7 +3,7 @@ resolver = "3"
 members = ["examples/*", "lazybe", "lazybe-macros"]
 
 [workspace.package]
-version = "0.1.2"                                       # bump
+version = "0.2.0"                                       # bump
 edition = "2024"
 authors = ["Pat Losoponkul <pat.losoponkul@gmail.com>"]
 license = "Apache-2.0"

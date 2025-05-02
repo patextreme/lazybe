@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2025-05-02
+
+### 🚀 Features
+
+- Add support for typed URI (#5)
+
+### 💼 Other
+
+- Update check steps (#4)
+
 ## [0.1.2] - 2025-04-24
 
 ### 🐛 Bug Fixes
