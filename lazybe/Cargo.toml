@@ -28,7 +28,7 @@ utoipa = { workspace = true, optional = true }
 
 [dependencies.lazybe-macros]
 path = "../lazybe-macros"
-version = "0.2.0"         # bump
+version = "0.2.1"         # bump
 
 [dev-dependencies]
 anyhow = { workspace = true }
